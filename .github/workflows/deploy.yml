@@ -1,0 +1,39 @@
+name: Deploy to Dokploy
+
+# Redeploys block-game.asikmydeen.com on every push to main.
+# Secrets DOKPLOY_URL / DOKPLOY_API_KEY / DOKPLOY_APP_ID are set by ship.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify deploy secrets are present
+        env:
+          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APP_ID: ${{ secrets.DOKPLOY_APP_ID }}
+        run: |
+          # Empty secrets produce deploys that "finish" instantly and silently
+          # do nothing, so fail loudly instead.
+          if [ -z "$API_KEY" ] || [ -z "$APP_ID" ]; then
+            echo "::error::DOKPLOY_API_KEY or DOKPLOY_APP_ID is empty."
+            exit 1
+          fi
+
+      - name: Trigger Dokploy deployment
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APP_ID: ${{ secrets.DOKPLOY_APP_ID }}
+        run: |
+          BASE="${DOKPLOY_URL:-https://projects.asikmydeen.com}"
+          code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
+            -X POST "$BASE/api/application.deploy" \
+            -H "x-api-key: $API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d "{\"applicationId\":\"$APP_ID\"}")
+          echo "HTTP $code"; cat /tmp/resp.json || true
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
