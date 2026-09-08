@@ -1,0 +1,39 @@
+{
+  "name": "block-game",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Craftworld — a blocky 3D voxel world with driving, rideable animals, zombies and multiplayer",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"node --watch server/index.mjs\"",
+    "dev:web": "vite",
+    "dev:api": "node --watch server/index.mjs",
+    "build": "vite build",
+    "start": "node server/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.0",
+    "express": "^5.1.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "three": "^0.184.0",
+    "ws": "^8.21.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^25.3.3",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.184.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^4.1.14",
+    "typescript": "~5.9.2",
+    "vite": "^7.3.2"
+  }
+}
