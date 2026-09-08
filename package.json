@@ -15,16 +15,14 @@
     "start": "node server/index.mjs",
     "typecheck": "tsc --noEmit"
   },
+  "comment": "Only the server's runtime deps live in dependencies; client libs are devDependencies because Vite bundles them into dist/ at build time, keeping the production image small.",
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.0",
     "express": "^5.1.0",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "three": "^0.184.0",
     "ws": "^8.21.1"
   },
   "devDependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/node": "^25.3.3",
     "@types/react": "^19.2.0",
@@ -32,7 +30,10 @@
     "@types/three": "^0.184.0",
     "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^9.1.2",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "tailwindcss": "^4.1.14",
+    "three": "^0.184.0",
     "typescript": "~5.9.2",
     "vite": "^7.3.2"
   }
