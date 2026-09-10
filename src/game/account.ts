@@ -14,6 +14,7 @@ export interface Account {
   deaths: number;
   ownedWeapons: string[];
   playSeconds: number;
+  missionsCompleted: string[];
 }
 
 export interface LeaderboardEntry {
@@ -145,6 +146,7 @@ export interface ProgressPatch {
   deaths?: number;
   playSeconds?: number;
   ownedWeapons?: string[];
+  missionsCompleted?: string[];
 }
 
 /** Persist run progress. Server keeps monotonic maxima, so this is safe to retry. */

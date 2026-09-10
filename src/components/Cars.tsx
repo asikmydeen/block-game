@@ -108,7 +108,7 @@ interface CarsProps {
   touchMode: boolean;
   onDrivingChange: (info: CarInfo | null) => void;
   onCrash: (damage: number, broken: boolean) => void;
-  onNearCar: (kind: CarKind | null) => void;
+  onNearCar: (info: { kind: CarKind; broken: boolean } | null) => void;
 }
 
 export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash, onNearCar }: CarsProps) {
@@ -123,7 +123,7 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
   const smokeRefs = useRef<(THREE.Group | null)[]>(cars.map(() => null));
   const wheelRefs = useRef<THREE.Mesh[][]>(cars.map(() => []));
   const nearTimerRef = useRef(0);
-  const lastNearRef = useRef<CarKind | null>(null);
+  const lastNearRef = useRef<{ kind: CarKind; broken: boolean } | null>(null);
 
   // Keep latest world/callbacks in refs so the registry effect registers once
   // and stays live across re-renders (world identity changes every render).
@@ -274,7 +274,7 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
     nearTimerRef.current -= dt;
     if (nearTimerRef.current <= 0) {
       nearTimerRef.current = 0.25;
-      let near: CarKind | null = null;
+      let near: { kind: CarKind; broken: boolean } | null = null;
       if (drivingId === null) {
         const p = playerPosRef.current;
         let bestDist = ENTER_RANGE;
@@ -283,11 +283,17 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
           const d = Math.hypot(p.x - car.pos.x, p.z - car.pos.z);
           if (d < bestDist && Math.abs(p.y - car.pos.y) < 4) {
             bestDist = d;
-            near = car.kind;
+            near = { kind: car.kind, broken: car.health <= 0 };
           }
         }
       }
-      if (near !== lastNearRef.current) {
+      const same =
+        (near === null && lastNearRef.current === null) ||
+        (near !== null &&
+          lastNearRef.current !== null &&
+          near.kind === lastNearRef.current.kind &&
+          near.broken === lastNearRef.current.broken);
+      if (!same) {
         lastNearRef.current = near;
         onNearCar(near);
       }
@@ -316,7 +322,7 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
         if (broken) throttle = 0;
 
         const topSpeed = spec.maxSpeed * powerState.carSpeedMult;
-        const handbrake = !touchMode && controls.jump && Math.abs(car.speed) > 0.5;
+        const handbrake = (touchMode ? touchState.jump : controls.jump) && Math.abs(car.speed) > 0.5;
 
         if (handbrake) {
           // Handbrake: hard decel; combined with steering it slides the tail

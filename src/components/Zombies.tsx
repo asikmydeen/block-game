@@ -6,6 +6,7 @@ import { powerState } from '../game/powers';
 import { combatRegistry } from '../game/combat';
 import { Humanoid, createLimbs, type HumanoidLimbs } from './Humanoid';
 import { LAMP_LIGHT_SPOTS, LAMP_SAFE_RADIUS } from './StreetLamps';
+import type { ZombieWave } from '../game/missions';
 
 interface ZombieData {
   id: number;
@@ -86,14 +87,17 @@ interface ZombiesProps {
   onDamagePlayer: (amount: number) => void;
   alive: boolean;
   night: boolean;
+  wave?: ZombieWave | null;
 }
 
-export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night }: ZombiesProps) {
+export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night, wave }: ZombiesProps) {
   const dataRef = useRef<ZombieData[] | null>(null);
   if (dataRef.current === null) {
     dataRef.current = createZombies();
   }
   const zombies = dataRef.current;
+  const waveRef = useRef(wave);
+  waveRef.current = wave;
 
   const groupRefs = useRef<(THREE.Group | null)[]>(zombies.map(() => null));
   const limbRefs = useRef<HumanoidLimbs[]>(zombies.map(() => createLimbs()));
@@ -136,7 +140,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night }: Z
       }
       if (z.health <= 0) {
         z.dead = true;
-        z.respawnTimer = 8;
+        z.respawnTimer = waveRef.current?.respawn ?? 8;
         combatRegistry.onZombieKilled?.(new THREE.Vector3(z.pos.x, z.pos.y, z.pos.z));
       }
       return new THREE.Vector3(z.pos.x, z.pos.y + 1.0, z.pos.z);
@@ -171,12 +175,15 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night }: Z
       const g0 = groupRefs.current[i];
 
       if (z.dead) {
+        const respawnAt = waveRef.current?.respawn ?? 8;
+        // Scale the fall-over window against the configured respawn.
+        const fallFor = Math.min(1, respawnAt * 0.12);
         z.respawnTimer -= dt;
         if (g0) {
           // fall over then hide
-          if (z.respawnTimer > 7) {
+          if (z.respawnTimer > respawnAt - fallFor) {
             g0.visible = true;
-            g0.rotation.z = Math.min(Math.PI / 2, (8 - z.respawnTimer) * 5);
+            g0.rotation.z = Math.min(Math.PI / 2, (respawnAt - z.respawnTimer) * 5);
           } else {
             g0.visible = false;
           }
@@ -184,7 +191,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night }: Z
         if (z.respawnTimer <= 0) {
           const sp = SPAWN_POINTS[z.id % SPAWN_POINTS.length];
           z.pos.set(sp[0], FLOOR_TOP_Y + 1, sp[1]);
-          z.health = 5;
+          z.health = waveRef.current?.health ?? 5;
           z.dead = false;
           z.hitTimer = 0;
           z.attackCooldown = 1;
@@ -226,7 +233,10 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night }: Z
       }
 
       if (z.walking) {
-        const speed = (seesPlayer ? z.speed * 1.4 : z.speed * 0.8) * powerState.zombieSpeedMult;
+        const speed =
+          (seesPlayer ? z.speed * 1.4 : z.speed * 0.8) *
+          powerState.zombieSpeedMult *
+          (waveRef.current?.speedMult ?? 1);
         const nx = z.pos.x + Math.cos(z.dir) * speed * dt;
         const nz = z.pos.z + Math.sin(z.dir) * speed * dt;
         const blocked =

@@ -51,6 +51,7 @@ export function publicPlayer(p) {
     deaths: p.deaths ?? 0,
     ownedWeapons: p.owned_weapons ?? ['hand', 'sword', 'blaster'],
     playSeconds: p.play_seconds ?? 0,
+    missionsCompleted: Array.isArray(p.missions_completed) ? p.missions_completed : [],
   };
 }
 

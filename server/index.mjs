@@ -103,6 +103,22 @@ app.post('/api/profile/progress', wrap(async (req, res) => {
     if (owned.length) patch.owned_weapons = owned;
   }
 
+  if (Array.isArray(b.missionsCompleted)) {
+    const allowed = new Set([
+      'park',
+      'firstblood',
+      'scavenger',
+      'wheels',
+      'nightwatch',
+      'streets',
+      'rooftop',
+      'laststand',
+    ]);
+    const incoming = b.missionsCompleted.filter((id) => allowed.has(id));
+    const prev = ctx.player.missions_completed ?? [];
+    patch.missions_completed = [...new Set([...prev, ...incoming])];
+  }
+
   const updated = await db.updatePlayerStats(ctx.player.id, patch);
   res.json({ player: auth.publicPlayer(updated ?? ctx.player) });
 }));

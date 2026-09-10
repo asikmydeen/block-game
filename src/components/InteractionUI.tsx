@@ -150,7 +150,7 @@ export function Toast({ message }: ToastProps) {
     <div
       style={{
         position: 'fixed',
-        bottom: 130,
+        top: 'calc(96px + env(safe-area-inset-top))',
         left: '50%',
         transform: 'translateX(-50%)',
         background: 'rgba(10,10,10,0.88)',
@@ -159,7 +159,7 @@ export function Toast({ message }: ToastProps) {
         borderRadius: 8,
         fontFamily: 'monospace',
         fontSize: 14,
-        zIndex: 200,
+        zIndex: 240,
         border: '1px solid #444',
         pointerEvents: 'none',
         whiteSpace: 'nowrap',

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+export type PlayStance = 'fight' | 'build';
+
 export interface TouchState {
   moveX: number;
   moveY: number;
@@ -132,14 +134,14 @@ function Joystick({ onChange }: JoystickProps) {
       onTouchStart={handleStart}
       style={{
         position: 'fixed',
-        left: 24,
-        bottom: 90,
-        width: 130,
-        height: 130,
+        left: 'max(16px, env(safe-area-inset-left))',
+        bottom: 'calc(84px + env(safe-area-inset-bottom))',
+        width: 118,
+        height: 118,
         borderRadius: '50%',
-        background: 'rgba(0,0,0,0.3)',
-        border: '2px solid rgba(255,255,255,0.25)',
-        zIndex: 150,
+        background: 'rgba(0,0,0,0.28)',
+        border: '2px solid rgba(255,255,255,0.22)',
+        zIndex: 210,
         touchAction: 'none',
         userSelect: 'none',
       }}
@@ -149,10 +151,10 @@ function Joystick({ onChange }: JoystickProps) {
           position: 'absolute',
           left: '50%',
           top: '50%',
-          width: 56,
-          height: 56,
-          marginLeft: -28,
-          marginTop: -28,
+          width: 52,
+          height: 52,
+          marginLeft: -26,
+          marginTop: -26,
           borderRadius: '50%',
           background: stick.active ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)',
           border: '2px solid rgba(255,255,255,0.7)',
@@ -165,9 +167,7 @@ function Joystick({ onChange }: JoystickProps) {
   );
 }
 
-interface LookPadProps {}
-
-function LookPad(_: LookPadProps) {
+function LookPad() {
   const padRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<{ id: number; x: number; y: number } | null>(null);
 
@@ -230,11 +230,8 @@ function LookPad(_: LookPadProps) {
       ref={padRef}
       style={{
         position: 'fixed',
-        right: 0,
-        top: 0,
-        width: '55%',
-        height: '70%',
-        zIndex: 140,
+        inset: 0,
+        zIndex: 50,
         touchAction: 'none',
       }}
     />
@@ -243,16 +240,23 @@ function LookPad(_: LookPadProps) {
 
 interface ActionButtonProps {
   label: string;
-  bottom: number;
-  right: number;
+  bottom: string;
+  right: string;
   size?: number;
   color?: string;
   onPress: () => void;
   onRelease?: () => void;
-  hold?: boolean;
 }
 
-function ActionButton({ label, bottom, right, size = 64, color = 'rgba(0,0,0,0.4)', onPress, onRelease, hold }: ActionButtonProps) {
+function ActionButton({
+  label,
+  bottom,
+  right,
+  size = 64,
+  color = 'rgba(0,0,0,0.4)',
+  onPress,
+  onRelease,
+}: ActionButtonProps) {
   const [pressed, setPressed] = useState(false);
   return (
     <div
@@ -284,9 +288,9 @@ function ActionButton({ label, bottom, right, size = 64, color = 'rgba(0,0,0,0.4
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: 'monospace',
-        fontSize: 13,
+        fontSize: size > 68 ? 13 : 12,
         fontWeight: 'bold',
-        zIndex: 160,
+        zIndex: 210,
         touchAction: 'none',
         userSelect: 'none',
         textShadow: '1px 1px 2px black',
@@ -297,11 +301,18 @@ function ActionButton({ label, bottom, right, size = 64, color = 'rgba(0,0,0,0.4
   );
 }
 
+const SAFE_RIGHT = 'calc(16px + env(safe-area-inset-right))';
+const SAFE_RIGHT_OFFSET = 'calc(96px + env(safe-area-inset-right))';
+const SAFE_BOTTOM_LOW = 'calc(16px + env(safe-area-inset-bottom))';
+const SAFE_BOTTOM_JUMP = 'calc(92px + env(safe-area-inset-bottom))';
+
 interface TouchControlsProps {
   enabled: boolean;
+  stance: PlayStance;
+  driving: boolean;
 }
 
-export function TouchControls({ enabled }: TouchControlsProps) {
+export function TouchControls({ enabled, stance, driving }: TouchControlsProps) {
   if (!enabled) return null;
 
   return (
@@ -314,30 +325,42 @@ export function TouchControls({ enabled }: TouchControlsProps) {
         }}
       />
       <ActionButton
-        label="JUMP"
-        bottom={210}
-        right={24}
+        label={driving ? 'BRAKE' : 'JUMP'}
+        bottom={SAFE_BOTTOM_JUMP}
+        right={SAFE_RIGHT}
         size={72}
-        color="rgba(70,130,180,0.55)"
-        onPress={() => { touchState.jump = true; }}
-        onRelease={() => { touchState.jump = false; }}
+        color={driving ? 'rgba(180,140,40,0.6)' : 'rgba(70,130,180,0.55)'}
+        onPress={() => {
+          touchState.jump = true;
+        }}
+        onRelease={() => {
+          touchState.jump = false;
+        }}
       />
-      <ActionButton
-        label="BREAK"
-        bottom={130}
-        right={106}
-        size={64}
-        color="rgba(180,60,60,0.55)"
-        onPress={() => { touchState.break = true; }}
-      />
-      <ActionButton
-        label="PLACE"
-        bottom={130}
-        right={24}
-        size={64}
-        color="rgba(60,150,80,0.55)"
-        onPress={() => { touchState.place = true; }}
-      />
+      {!driving && (
+        <ActionButton
+          label={stance === 'build' ? 'BREAK' : 'ATK'}
+          bottom={SAFE_BOTTOM_LOW}
+          right={SAFE_RIGHT_OFFSET}
+          size={64}
+          color="rgba(180,60,60,0.55)"
+          onPress={() => {
+            touchState.break = true;
+          }}
+        />
+      )}
+      {!driving && stance === 'build' && (
+        <ActionButton
+          label="PLACE"
+          bottom={SAFE_BOTTOM_LOW}
+          right={SAFE_RIGHT}
+          size={64}
+          color="rgba(60,150,80,0.55)"
+          onPress={() => {
+            touchState.place = true;
+          }}
+        />
+      )}
     </>
   );
 }

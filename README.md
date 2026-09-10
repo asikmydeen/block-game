@@ -1,7 +1,8 @@
 # Craftworld (block-game)
 
 A blocky 3D voxel world — build and mine, drive cars that obey traffic lights, ride
-animals, fight zombies for points, buy weapons, and see other players in real time.
+animals, fight zombies for points, run a short city campaign, buy weapons, and
+fight Night Raids with other players.
 
 Live: https://block-game.asikmydeen.com
 
@@ -35,11 +36,12 @@ origin and no CORS or cross-host config is needed.
 
 ## Persistence
 
-Score, best score, zombie kills, deaths, unlocked weapons, and playtime are saved
-to the account. Writes are debounced (~2s) and **monotonic on the server** —
-`best_score`, kills, deaths, playtime only ever increase, and purchased weapons are
-never removed — so a stale or offline client can't erase earned progress. A
-`pagehide` beacon does a final save when you close the tab.
+Score, best score, zombie kills, deaths, unlocked weapons, completed missions, and
+playtime are saved to the account. Writes are debounced (~2s) and **monotonic on
+the server** — `best_score`, kills, deaths, playtime only ever increase, purchased
+weapons are never removed, and mission ids are a union — so a stale or offline
+client can't erase earned progress. A `pagehide` beacon does a final save when you
+close the tab. Completed missions are also cached in `localStorage` per account.
 
 ## API
 
@@ -64,7 +66,15 @@ account; a second sign-in kicks the older one.
 Three tables (applied to Supabase Postgres):
 
 - `bg_players` — identity + stats (`username_lower` generated column carries the
-  case-insensitive unique index)
+  case-insensitive unique index). Add missions with:
+
+  ```sql
+  alter table bg_players
+    add column if not exists missions_completed text[] not null default '{}';
+  ```
+
+  The API falls back if the column is missing so login still works before you
+  migrate; mission progress then lives in `localStorage` until the column exists.
 - `bg_sessions` — issued session tokens
 - `bg_devices` — `deviceId → player` map that powers "same computer, same account"
 
@@ -92,7 +102,25 @@ npm start                 # express serves dist/public + /api + /api/mp
 ## Controls
 
 WASD move · Space jump · Mouse look · Left click break/attack · Right click place ·
-1–9 blocks · Q weapon · B weapon shop · V camera · N day/night · E car or animal ·
-R repair car · Space handbrake while driving.
+1–9 blocks · Q weapon · B weapon shop · Esc pause (camera, day/night, missions) ·
+E car or animal · R repair car · Space handbrake while driving.
+
+On a phone: joystick to move, drag to look, JUMP / ATK on the right. Fight/Build
+switch sits under the joystick with the current weapon or block. Drive / Ride /
+Fix appear only when something is nearby. ☰ opens pause (missions, camera,
+day/night, touch/mouse). 🛒 is the shop.
 
 Lamplight repels zombies at night. You can fight from animal-back.
+
+## Missions
+
+Eight sequential jobs in the existing city (park, kills, chest, drive, night
+survive, night hunt, rooftop, last stand). Open ☰ → Missions, or accept the
+first-run prompt. Completing one auto-starts the next. Rewards are shop points.
+
+## Multiplayer Night Raid
+
+Any joined player can start a Night Raid from pause. The server tracks a shared
+kill goal across three night waves; each client still simulates its own zombies
+and reports kills. Win a wave for bonus points. Pause also has a ping (beacon
+others can see) and a nearby-player list.

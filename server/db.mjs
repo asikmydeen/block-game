@@ -32,28 +32,59 @@ async function rest(path, init = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-const PLAYER_COLS =
+const PLAYER_COLS_CORE =
   'id,username,color,score,best_score,zombie_kills,deaths,owned_weapons,play_seconds,created_at,last_seen_at';
+let playerCols = `${PLAYER_COLS_CORE},missions_completed`;
+let missionsColumn = true;
+
+function dropMissionsColumn(err) {
+  const msg = String(err);
+  if (missionsColumn && /missions_completed/i.test(msg)) {
+    missionsColumn = false;
+    playerCols = PLAYER_COLS_CORE;
+    return true;
+  }
+  return false;
+}
+
+export function missionsColumnEnabled() {
+  return missionsColumn;
+}
 
 export async function findPlayerByUsername(username) {
-  const rows = await rest(
-    `bg_players?select=${PLAYER_COLS}&username_lower=eq.${encodeURIComponent(username.toLowerCase())}&limit=1`
-  );
-  return rows?.[0] || null;
+  try {
+    const rows = await rest(
+      `bg_players?select=${playerCols}&username_lower=eq.${encodeURIComponent(username.toLowerCase())}&limit=1`
+    );
+    return rows?.[0] || null;
+  } catch (err) {
+    if (dropMissionsColumn(err)) return findPlayerByUsername(username);
+    throw err;
+  }
 }
 
 export async function findPlayerById(id) {
-  const rows = await rest(`bg_players?select=${PLAYER_COLS}&id=eq.${encodeURIComponent(id)}&limit=1`);
-  return rows?.[0] || null;
+  try {
+    const rows = await rest(`bg_players?select=${playerCols}&id=eq.${encodeURIComponent(id)}&limit=1`);
+    return rows?.[0] || null;
+  } catch (err) {
+    if (dropMissionsColumn(err)) return findPlayerById(id);
+    throw err;
+  }
 }
 
 export async function createPlayer(username, color) {
-  const rows = await rest(`bg_players?select=${PLAYER_COLS}`, {
-    method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify([{ username, color }]),
-  });
-  return rows?.[0] || null;
+  try {
+    const rows = await rest(`bg_players?select=${playerCols}`, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify([{ username, color }]),
+    });
+    return rows?.[0] || null;
+  } catch (err) {
+    if (dropMissionsColumn(err)) return createPlayer(username, color);
+    throw err;
+  }
 }
 
 export async function touchPlayer(id) {
@@ -65,12 +96,19 @@ export async function touchPlayer(id) {
 }
 
 export async function updatePlayerStats(id, patch) {
-  const rows = await rest(`bg_players?id=eq.${encodeURIComponent(id)}&select=${PLAYER_COLS}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify(patch),
-  });
-  return rows?.[0] || null;
+  const body = { ...patch };
+  if (!missionsColumn) delete body.missions_completed;
+  try {
+    const rows = await rest(`bg_players?id=eq.${encodeURIComponent(id)}&select=${playerCols}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify(body),
+    });
+    return rows?.[0] || null;
+  } catch (err) {
+    if (dropMissionsColumn(err)) return updatePlayerStats(id, patch);
+    throw err;
+  }
 }
 
 export async function createSession(token, playerId, deviceId) {

@@ -1,12 +1,13 @@
-import { useState, useCallback, useEffect, useRef, Suspense, type MutableRefObject } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense, type MutableRefObject } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Sky, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import { useWorld } from '../game/useWorld';
 import { World } from '../components/World';
 import { Player, type CameraMode } from '../components/Player';
-import { GameUI } from '../components/GameUI';
-import { TouchControls, isTouchDevice } from '../components/TouchControls';
+import { GameUI, type NearCar } from '../components/GameUI';
+import { TouchControls, isTouchDevice, type PlayStance } from '../components/TouchControls';
+import { WaypointMarker } from '../components/WaypointMarker';
 import { Villagers } from '../components/Villagers';
 import { Zombies } from '../components/Zombies';
 import { BlockType } from '../game/terrain';
@@ -20,11 +21,25 @@ import { generateRoadUpdates } from '../game/roads';
 import { generateForestUpdates, generateParkUpdates } from '../game/decorations';
 import { StreetLamps } from '../components/StreetLamps';
 import { Animals } from '../components/Animals';
-import { animalsRegistry, ridingState, RIDE_SPECS, type RideableKind } from '../game/animals';
+import { animalsRegistry, ridingState, type RideableKind } from '../game/animals';
 import { getToken, saveProgress, type Account } from '../game/account';
-import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
+import { CAR_SPECS, type CarInfo, carsRegistry, drivingState } from '../game/cars';
 import { powerState } from '../game/powers';
 import { RemotePlayers } from '../components/RemotePlayers';
+import {
+  MISSIONS,
+  RAID_BONUS,
+  getMission,
+  isUnlocked,
+  loadLocalMissions,
+  mergeMissions,
+  nextMission,
+  raidZombieWave,
+  saveLocalMissions,
+  type MissionId,
+  type ZombieWave,
+} from '../game/missions';
+import { mpBridge, RAID_IDLE, type MpPlayerInfo, type PingEvent, type RaidState } from '../game/mpBridge';
 
 export type GameMode = 'free' | 'multi';
 
@@ -62,6 +77,8 @@ function GameScene({
   onNearAnimal,
   cameraMode,
   night,
+  wave,
+  waypoints,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
@@ -76,10 +93,12 @@ function GameScene({
   weapon: WeaponType;
   onDrivingChange: (info: CarInfo | null) => void;
   onCrash: (damage: number, broken: boolean) => void;
-  onNearCar: (kind: CarKind | null) => void;
+  onNearCar: (info: NearCar) => void;
   onNearAnimal: (kind: RideableKind | null) => void;
   cameraMode: CameraMode;
   night: boolean;
+  wave?: ZombieWave | null;
+  waypoints?: Array<{ x: number; y: number; z: number; label: string; color?: string }>;
 }) {
   const bgColor = night ? '#0a1024' : '#87CEEB';
   const fogArgs: [string, number, number] = night
@@ -144,7 +163,18 @@ function GameScene({
         onDamagePlayer={onDamagePlayer}
         alive={alive}
         night={night}
+        wave={wave}
       />
+      {waypoints?.map((w) => (
+        <WaypointMarker
+          key={`${w.label}-${w.x}-${w.z}`}
+          x={w.x}
+          y={w.y}
+          z={w.z}
+          label={w.label}
+          color={w.color}
+        />
+      ))}
       <Player
         world={world}
         onBlockInteract={onBlockInteract}
@@ -191,9 +221,25 @@ export default function Game({
   const [chestLoot, setChestLoot] = useState<LootItem[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [carInfo, setCarInfo] = useState<CarInfo | null>(null);
-  const [nearCar, setNearCar] = useState<CarKind | null>(null);
+  const [nearCar, setNearCar] = useState<NearCar>(null);
   const [nearAnimal, setNearAnimal] = useState<RideableKind | null>(null);
   const [riding, setRiding] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [playStance, setPlayStance] = useState<PlayStance>('fight');
+  const [completedMissions, setCompletedMissions] = useState<Set<MissionId>>(() =>
+    mergeMissions(account.missionsCompleted, loadLocalMissions(account.id))
+  );
+  const [activeMission, setActiveMission] = useState<MissionId | null>(null);
+  const [missionCount, setMissionCount] = useState(0);
+  const [missionStartedAt, setMissionStartedAt] = useState(0);
+  const [campaignDismissed, setCampaignDismissed] = useState(
+    () => mergeMissions(account.missionsCompleted, loadLocalMissions(account.id)).size > 0
+  );
+  const [raid, setRaid] = useState<RaidState>(RAID_IDLE);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [pingMark, setPingMark] = useState<{ x: number; y: number; z: number; from: string; until: number } | null>(null);
+  const [mpPlayers, setMpPlayers] = useState<MpPlayerInfo[]>([]);
+  const awardedRaidWaveRef = useRef(0);
   // Score and unlocked weapons are restored from the signed-in account.
   const [score, setScore] = useState(() => account.score ?? 0);
   const [ownedWeapons, setOwnedWeapons] = useState<ReadonlySet<WeaponType>>(
@@ -245,18 +291,28 @@ export default function Game({
   // ── Progress autosave ───────────────────────────────────────────────────
   // Debounced so a fast kill streak doesn't spam the API. The server keeps
   // monotonic maxima, so a dropped save is recovered by the next one.
-  const progressRef = useRef({ score, zombieKills, deathCount, ownedWeapons });
-  progressRef.current = { score, zombieKills, deathCount, ownedWeapons };
+  const progressRef = useRef({ score, zombieKills, deathCount, ownedWeapons, completedMissions });
+  progressRef.current = { score, zombieKills, deathCount, ownedWeapons, completedMissions };
+  const raidRef = useRef(raid);
+  raidRef.current = raid;
+  const activeMissionRef = useRef(activeMission);
+  activeMissionRef.current = activeMission;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const touchModeRef = useRef(touchMode);
+  touchModeRef.current = touchMode;
   const sessionStartRef = useRef(Date.now());
 
   useEffect(() => {
     const t = setTimeout(() => {
       const p = progressRef.current;
+      saveLocalMissions(account.id, p.completedMissions);
       saveProgress({
         score: p.score,
         zombieKills: p.zombieKills,
         deaths: p.deathCount,
         ownedWeapons: [...p.ownedWeapons],
+        missionsCompleted: [...p.completedMissions],
         playSeconds:
           (account.playSeconds ?? 0) + Math.floor((Date.now() - sessionStartRef.current) / 1000),
       }).then(updated => {
@@ -264,7 +320,7 @@ export default function Game({
       });
     }, 2000);
     return () => clearTimeout(t);
-  }, [score, zombieKills, deathCount, ownedWeapons, account.playSeconds, onAccountChange]);
+  }, [score, zombieKills, deathCount, ownedWeapons, completedMissions, account.playSeconds, account.id, onAccountChange]);
 
   // Best-effort final save when leaving the page.
   useEffect(() => {
@@ -281,6 +337,7 @@ export default function Game({
               zombieKills: p.zombieKills,
               deaths: p.deathCount,
               ownedWeapons: [...p.ownedWeapons],
+              missionsCompleted: [...p.completedMissions],
               token,
             }),
           ],
@@ -295,12 +352,17 @@ export default function Game({
     };
   }, []);
 
-  // Zombie kills award shop points
+  // Zombie kills award shop points and feed missions / raids.
   useEffect(() => {
     combatRegistry.onZombieKilled = () => {
       if (!aliveRef.current) return;
       setScore(s => s + KILL_POINTS);
       setZombieKills(k => k + 1);
+      const mid = activeMissionRef.current;
+      if (mid && getMission(mid).kind === 'kills') {
+        setMissionCount(c => c + 1);
+      }
+      if (raidRef.current.phase === 'active') mpBridge.raidKill();
     };
     return () => {
       combatRegistry.onZombieKilled = null;
@@ -320,6 +382,7 @@ export default function Game({
     if (next <= 0) {
       aliveRef.current = false;
       setShowDeath(true);
+      setPaused(false);
       setDeathCount(d => d + 1);
       // Force out of any car/animal so respawn isn't overridden by ride sync
       if (drivingState.active) {
@@ -328,6 +391,16 @@ export default function Game({
       if (ridingState.active) {
         animalsRegistry.toggleRide?.(playerPosRef.current);
         setRiding(false);
+      }
+      const mid = activeMissionRef.current;
+      if (mid) {
+        const def = getMission(mid);
+        if (def.kind === 'survive') {
+          setActiveMission(null);
+          setMissionCount(0);
+          if (def.night) setNight(false);
+          showToastRef.current?.(`${def.title} failed. Retry from Missions.`);
+        }
       }
     }
   }, []);
@@ -359,6 +432,54 @@ export default function Game({
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   }, []);
 
+  const startMission = useCallback((id: MissionId) => {
+    const def = getMission(id);
+    activeMissionRef.current = id;
+    setActiveMission(id);
+    setMissionCount(0);
+    setMissionStartedAt(Date.now());
+    setPaused(false);
+    setCampaignDismissed(true);
+    if (def.night) setNight(true);
+    if (!touchModeRef.current) canvasElRef.current?.requestPointerLock();
+    showToast(`${def.title} — ${def.blurb}`);
+  }, [showToast]);
+
+  const abandonMission = useCallback(() => {
+    const id = activeMissionRef.current;
+    if (id && getMission(id).night) setNight(false);
+    setActiveMission(null);
+    setMissionCount(0);
+    showToast('Mission abandoned.');
+  }, [showToast]);
+
+  const completeMission = useCallback((id: MissionId) => {
+    if (activeMissionRef.current !== id) return;
+    activeMissionRef.current = null;
+    const def = getMission(id);
+    setCompletedMissions(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      saveLocalMissions(account.id, next);
+      return next;
+    });
+    setScore(s => s + def.reward);
+    setActiveMission(null);
+    setMissionCount(0);
+    if (def.night) setNight(false);
+    showToast(`${def.title} complete! +${def.reward} ⭐`);
+    const done = mergeMissions(completedMissions, [id]);
+    const nxt = nextMission(done);
+    if (nxt) {
+      window.setTimeout(() => {
+        if (activeMissionRef.current) return;
+        startMission(nxt);
+      }, 2500);
+    } else {
+      window.setTimeout(() => showToast('Campaign complete. You held the city.'), 2600);
+    }
+  }, [account.id, completedMissions, showToast, startMission]);
+
   const handleInteract = useCallback((wx: number, wy: number, wz: number) => {
     const bt = world.getBlock(wx, wy, wz);
     if (bt === 'door') {
@@ -371,6 +492,8 @@ export default function Game({
       setChestLoot(generateLoot(powerState.lootLuck));
       setChestOpen(true);
       if (document.pointerLockElement) document.exitPointerLock();
+      const mid = activeMissionRef.current;
+      if (mid && getMission(mid).kind === 'chests') setMissionCount(c => c + 1);
     } else if (bt === 'bed') {
       healthRef.current = powerState.maxHealth;
       setHealth(powerState.maxHealth);
@@ -403,6 +526,22 @@ export default function Game({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (shopOpenRef.current) {
+          setShopOpen(false);
+          return;
+        }
+        setPaused(p => {
+          if (p) {
+            if (!touchModeRef.current) canvasElRef.current?.requestPointerLock();
+            return false;
+          }
+          document.exitPointerLock?.();
+          return true;
+        });
+        return;
+      }
+      if (pausedRef.current) return;
       if (e.key === 'b' || e.key === 'B') {
         if (e.repeat) return;
         setShopOpen(open => {
@@ -412,7 +551,6 @@ export default function Game({
         return;
       }
       if (shopOpenRef.current) {
-        if (e.key === 'Escape') setShopOpen(false);
         return;
       }
       const num = parseInt(e.key);
@@ -435,6 +573,8 @@ export default function Game({
       }
       if (e.key === 'n' || e.key === 'N') {
         if (e.repeat) return;
+        const mid = activeMissionRef.current;
+        if ((mid && getMission(mid).night) || raidRef.current.phase === 'active') return;
         setNight(n => !n);
       }
       if (e.key === 'e' || e.key === 'E') {
@@ -527,8 +667,78 @@ export default function Game({
 
   const openShop = useCallback(() => {
     if (document.pointerLockElement) document.exitPointerLock();
+    setPaused(false);
     setShopOpen(true);
   }, []);
+
+  const handleTogglePause = useCallback(() => {
+    setPaused(p => {
+      if (p) {
+        if (!touchModeRef.current) canvasElRef.current?.requestPointerLock();
+        return false;
+      }
+      document.exitPointerLock?.();
+      return true;
+    });
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const id = activeMission;
+    if (!id) return;
+    const def = getMission(id);
+    const pos = playerPosRef.current;
+    if (def.kind === 'goto' && def.target) {
+      const dist = Math.hypot(pos.x - def.target.x, pos.z - def.target.z);
+      const yOk = def.target.y == null || pos.y >= def.target.y - 2;
+      if (dist <= def.target.r && yOk) completeMission(id);
+    }
+    if (def.kind === 'drive' && def.target && drivingState.active) {
+      const dist = Math.hypot(pos.x - def.target.x, pos.z - def.target.z);
+      if (dist <= def.target.r) completeMission(id);
+    }
+    if (def.kind === 'kills' && missionCount >= (def.count ?? 1)) completeMission(id);
+    if (def.kind === 'chests' && missionCount >= (def.count ?? 1)) completeMission(id);
+    if (def.kind === 'survive' && missionStartedAt > 0) {
+      const elapsed = (nowMs - missionStartedAt) / 1000;
+      if (elapsed >= (def.duration ?? 0)) completeMission(id);
+    }
+  }, [nowMs, activeMission, missionCount, missionStartedAt, completeMission]);
+
+  const lastRaidNote = useRef('');
+  useEffect(() => {
+    const key = `${raid.phase}-${raid.wave}`;
+    if (raid.phase === 'active') setNight(true);
+    else if (raid.phase === 'rest' || raid.phase === 'won') {
+      if (!(activeMissionRef.current && getMission(activeMissionRef.current).night)) {
+        setNight(false);
+      }
+    }
+    if (lastRaidNote.current === key) return;
+    lastRaidNote.current = key;
+    if ((raid.phase === 'rest' || raid.phase === 'won') && raid.wave > 0) {
+      if (awardedRaidWaveRef.current !== raid.wave) {
+        awardedRaidWaveRef.current = raid.wave;
+        const bonus = RAID_BONUS[raid.wave] ?? 40;
+        setScore(s => s + bonus);
+        showToast(
+          raid.phase === 'won'
+            ? `Night Raid won! +${bonus} ⭐`
+            : `Wave ${raid.wave} cleared! +${bonus} ⭐`
+        );
+      }
+    }
+    if (raid.phase === 'idle') awardedRaidWaveRef.current = 0;
+    if (raid.phase === 'failed') showToast('The horde overran the city.');
+  }, [raid.phase, raid.wave, showToast]);
+
+  useEffect(() => {
+    if (pingMark && pingMark.until <= nowMs) setPingMark(null);
+  }, [nowMs, pingMark]);
 
   const handleRepairButton = useCallback(() => {
     if (drivingState.active) return;
@@ -566,12 +776,103 @@ export default function Game({
 
   const handleStart = useCallback(() => {
     setStarted(true);
+    setPaused(false);
     // On desktop the overlay covers the canvas, so the canvas click handler
     // can never fire; request pointer lock directly from the overlay click.
     if (!touchMode) {
       canvasElRef.current?.requestPointerLock();
     }
   }, [touchMode]);
+
+  const nightLocked =
+    !!(activeMission && getMission(activeMission).night) || raid.phase === 'active';
+
+  const zombieWave = useMemo(() => {
+    if (raid.phase === 'active') return raidZombieWave(raid.wave);
+    if (activeMission) return getMission(activeMission).wave ?? null;
+    return null;
+  }, [raid.phase, raid.wave, activeMission]);
+
+  const waypoints = useMemo(() => {
+    const list: Array<{ x: number; y: number; z: number; label: string; color?: string }> = [];
+    if (pingMark && pingMark.until > nowMs) {
+      list.push({ x: pingMark.x, y: pingMark.y, z: pingMark.z, label: pingMark.from, color: '#5ad1ff' });
+    }
+    if (activeMission) {
+      const t = getMission(activeMission).target;
+      if (t) list.push({ x: t.x, y: t.y ?? 13, z: t.z, label: t.label });
+    }
+    return list;
+  }, [pingMark, nowMs, activeMission]);
+
+  const objective = useMemo(() => {
+    if (raid.phase === 'active') {
+      const remain = Math.max(0, Math.ceil((raid.endsAt - nowMs) / 1000));
+      return {
+        title: `Night Raid · wave ${raid.wave}`,
+        detail: `${raid.kills}/${raid.goal} kills · ${remain}s`,
+      };
+    }
+    if (raid.phase === 'rest') {
+      const remain = Math.max(0, Math.ceil((raid.endsAt - nowMs) / 1000));
+      return { title: 'Night Raid', detail: `Rest · next wave in ${remain}s` };
+    }
+    if (!activeMission) return null;
+    const def = getMission(activeMission);
+    let detail = def.blurb;
+    if (def.kind === 'kills') detail = `${missionCount}/${def.count ?? 0} kills`;
+    if (def.kind === 'chests') detail = 'Loot a chest';
+    if (def.kind === 'survive' && missionStartedAt) {
+      const remain = Math.max(0, Math.ceil(def.duration! - (nowMs - missionStartedAt) / 1000));
+      detail = `Survive ${remain}s`;
+    }
+    if (def.kind === 'goto' && def.target) detail = `Go to ${def.target.label}`;
+    if (def.kind === 'drive' && def.target) detail = `Drive to ${def.target.label}`;
+    return { title: def.title, detail };
+  }, [raid, nowMs, activeMission, missionCount, missionStartedAt]);
+
+  const missionItems = useMemo(
+    () =>
+      MISSIONS.map((m) => ({
+        id: m.id,
+        title: m.title,
+        blurb: m.blurb,
+        hint: m.hint,
+        reward: m.reward,
+        status: (completedMissions.has(m.id)
+          ? 'done'
+          : activeMission === m.id
+            ? 'active'
+            : isUnlocked(m.id, completedMissions)
+              ? 'available'
+              : 'locked') as 'locked' | 'available' | 'active' | 'done',
+      })),
+    [completedMissions, activeMission]
+  );
+
+  const nearbyPlayers = useMemo(() => {
+    const p = playerPos;
+    return mpPlayers.map((o) => ({
+      name: o.name,
+      dist: Math.hypot(o.x - p.x, o.y - p.y, o.z - p.z),
+    }));
+  }, [mpPlayers, playerPos]);
+
+  const handlePing = useCallback(() => {
+    const p = playerPosRef.current;
+    mpBridge.ping(p.x, p.y, p.z);
+  }, []);
+
+  const handleRaidStart = useCallback(() => {
+    mpBridge.raidStart();
+    setPaused(false);
+    if (!touchModeRef.current) canvasElRef.current?.requestPointerLock();
+  }, []);
+
+  const handleAcceptCampaign = useCallback(() => {
+    const nxt = nextMission(completedMissions) ?? 'park';
+    startMission(nxt);
+  }, [completedMissions, startMission]);
 
   if (webglError) {
     return (
@@ -629,11 +930,19 @@ export default function Game({
               onNearAnimal={setNearAnimal}
               cameraMode={cameraMode}
               night={night}
+              wave={zombieWave}
+              waypoints={waypoints}
             />
             {mode === 'multi' && (
               <RemotePlayers
                 playerPosRef={playerPosRef}
                 onStatusChange={(status, count) => setMpStatus({ status, count })}
+                onRaid={setRaid}
+                onPlayers={setMpPlayers}
+                onPing={(ev: PingEvent) => {
+                  setPingMark({ ...ev, until: Date.now() + 8000 });
+                  showToastRef.current?.(`${ev.from} pinged a location`);
+                }}
               />
             )}
           </Suspense>
@@ -644,7 +953,8 @@ export default function Game({
         selectedBlock={selectedBlock}
         onSelectBlock={setSelectedBlock}
         position={playerPos}
-        isLocked={touchMode ? started : isLocked}
+        started={started}
+        isLocked={isLocked}
         touchMode={touchMode}
         onToggleTouchMode={() => setTouchMode(t => !t)}
         onStart={handleStart}
@@ -658,7 +968,9 @@ export default function Game({
         ownedWeapons={ownedWeapons}
         onOpenShop={openShop}
         night={night}
-        onToggleNight={() => setNight(n => !n)}
+        onToggleNight={() => {
+          if (!nightLocked) setNight(n => !n);
+        }}
         nearAnimal={nearAnimal}
         riding={riding}
         onRideButton={toggleRide}
@@ -667,32 +979,26 @@ export default function Game({
         onCarButton={handleCarButton}
         onRepairButton={handleRepairButton}
         onMenu={onMenu}
+        paused={paused}
+        onTogglePause={handleTogglePause}
+        playStance={playStance}
+        onPlayStance={setPlayStance}
+        nightLocked={nightLocked}
+        objective={objective}
+        missions={missionItems}
+        onStartMission={startMission}
+        onAbandonMission={abandonMission}
+        showCampaignPrompt={started && !campaignDismissed && !paused && !showDeath}
+        onAcceptCampaign={handleAcceptCampaign}
+        onDismissCampaign={() => setCampaignDismissed(true)}
+        mode={mode}
+        raid={mode === 'multi' ? raid : null}
+        nowMs={nowMs}
+        onStartRaid={handleRaidStart}
+        onPing={handlePing}
+        nearbyPlayers={nearbyPlayers}
+        mpStatus={mode === 'multi' ? mpStatus : undefined}
       />
-
-      {mode === 'multi' && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.55)',
-            color: mpStatus.status === 'online' ? '#8affc1' : mpStatus.status === 'connecting' ? '#ffd24d' : '#ff8a8a',
-            padding: '4px 14px',
-            borderRadius: 8,
-            fontFamily: 'monospace',
-            fontSize: 12,
-            zIndex: 100,
-            pointerEvents: 'none',
-          }}
-        >
-          {mpStatus.status === 'online'
-            ? `🌐 Online — ${mpStatus.count} other player${mpStatus.count === 1 ? '' : 's'}`
-            : mpStatus.status === 'connecting'
-              ? '🌐 Connecting...'
-              : '🌐 Offline — reconnecting...'}
-        </div>
-      )}
 
       {isFlashing && (
         <div
@@ -744,7 +1050,11 @@ export default function Game({
         </div>
       )}
 
-      <TouchControls enabled={touchMode && started && !showDeath} />
+      <TouchControls
+        enabled={touchMode && started && !showDeath && !paused && !shopOpen}
+        stance={playStance}
+        driving={!!carInfo}
+      />
 
       {shopOpen && (
         <div

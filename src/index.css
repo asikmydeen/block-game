@@ -7,8 +7,9 @@
     padding: 0;
   }
 
-  body {
+  html, body {
     overflow: hidden;
     background: #87CEEB;
+    height: 100%;
   }
 }

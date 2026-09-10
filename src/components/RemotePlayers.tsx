@@ -4,6 +4,7 @@ import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { Humanoid, createLimbs, type HumanoidLimbs } from './Humanoid';
 import { getToken } from '../game/account';
+import { mpBridge, RAID_IDLE, type MpPlayerInfo, type PingEvent, type RaidState } from '../game/mpBridge';
 
 interface RemotePlayer {
   id: string;
@@ -18,9 +19,12 @@ interface RemotePlayer {
 interface RemotePlayersProps {
   playerPosRef: MutableRefObject<THREE.Vector3>;
   onStatusChange: (status: 'connecting' | 'online' | 'offline', count: number) => void;
+  onRaid?: (raid: RaidState) => void;
+  onPing?: (ping: PingEvent) => void;
+  onPlayers?: (players: MpPlayerInfo[]) => void;
 }
 
-export function RemotePlayers({ playerPosRef, onStatusChange }: RemotePlayersProps) {
+export function RemotePlayers({ playerPosRef, onStatusChange, onRaid, onPing, onPlayers }: RemotePlayersProps) {
   const { camera } = useThree();
   const [players, setPlayers] = useState<RemotePlayer[]>([]);
   const myIdRef = useRef<string | null>(null);
@@ -28,6 +32,12 @@ export function RemotePlayers({ playerPosRef, onStatusChange }: RemotePlayersPro
   const groupRefs = useRef<Map<string, THREE.Group>>(new Map());
   const targetsRef = useRef<Map<string, RemotePlayer>>(new Map());
   const limbRefs = useRef<Map<string, HumanoidLimbs>>(new Map());
+  const onRaidRef = useRef(onRaid);
+  const onPingRef = useRef(onPing);
+  const onPlayersRef = useRef(onPlayers);
+  onRaidRef.current = onRaid;
+  onPingRef.current = onPing;
+  onPlayersRef.current = onPlayers;
 
   useEffect(() => {
     let closed = false;
@@ -44,6 +54,9 @@ export function RemotePlayers({ playerPosRef, onStatusChange }: RemotePlayersPro
       wsRef.current = ws;
 
       ws.onopen = () => {
+        mpBridge.send = (m) => {
+          if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
+        };
         // Identity comes from the account session — the server resolves the
         // username, so no client-supplied nickname is trusted.
         ws?.send(JSON.stringify({ type: 'join', token: getToken() }));
@@ -86,6 +99,24 @@ export function RemotePlayers({ playerPosRef, onStatusChange }: RemotePlayersPro
               return sameIds ? prev : others;
             });
             onStatusChange('online', others.length);
+            onPlayersRef.current?.(
+              others.map((p) => ({ id: p.id, name: p.name, x: p.x, y: p.y, z: p.z }))
+            );
+          } else if (msg.type === 'raid') {
+            onRaidRef.current?.({
+              phase: msg.phase ?? 'idle',
+              wave: Number(msg.wave) || 0,
+              kills: Number(msg.kills) || 0,
+              goal: Number(msg.goal) || 0,
+              endsAt: Number(msg.endsAt) || 0,
+            });
+          } else if (msg.type === 'ping') {
+            onPingRef.current?.({
+              from: String(msg.from ?? 'player'),
+              x: Number(msg.x) || 0,
+              y: Number(msg.y) || 0,
+              z: Number(msg.z) || 0,
+            });
           }
         } catch {
           // ignore malformed messages
@@ -93,6 +124,7 @@ export function RemotePlayers({ playerPosRef, onStatusChange }: RemotePlayersPro
       };
 
       ws.onclose = () => {
+        mpBridge.send = null;
         if (sendTimer) clearInterval(sendTimer);
         sendTimer = null;
         if (!closed) {
@@ -108,6 +140,9 @@ export function RemotePlayers({ playerPosRef, onStatusChange }: RemotePlayersPro
     connect();
     return () => {
       closed = true;
+      mpBridge.send = null;
+      onRaidRef.current?.(RAID_IDLE);
+      onPlayersRef.current?.([]);
       if (sendTimer) clearInterval(sendTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();
