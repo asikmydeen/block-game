@@ -101,6 +101,7 @@ interface GameUIProps {
   onPing: () => void;
   nearbyPlayers: NearbyPlayer[];
   mpStatus?: { status: 'connecting' | 'online' | 'offline'; count: number };
+  dead?: boolean;
 }
 
 function Heart({ state, size = 18 }: { state: 'full' | 'half' | 'empty'; size?: number }) {
@@ -247,11 +248,12 @@ export function GameUI({
   onPing,
   nearbyPlayers,
   mpStatus,
+  dead,
 }: GameUIProps) {
   const [pausePanel, setPausePanel] = useState<'root' | 'missions' | 'help'>('root');
   const [sheet, setSheet] = useState<null | 'block' | 'weapon'>(null);
 
-  const playing = started && (touchMode || isLocked || paused);
+  const playing = started && !dead && (touchMode || isLocked || paused);
   const driving = !!carInfo;
 
   let context: { label: string; color: string; action: () => void } | null = null;
@@ -485,7 +487,7 @@ export function GameUI({
           style={{
             position: 'fixed',
             right: 'max(16px, env(safe-area-inset-right))',
-            bottom: 'calc(176px + env(safe-area-inset-bottom))',
+            bottom: 'calc(186px + env(safe-area-inset-bottom))',
             zIndex: 220,
             background: context.color,
             color: 'white',
@@ -509,7 +511,7 @@ export function GameUI({
           style={{
             position: 'fixed',
             left: 'max(12px, env(safe-area-inset-left))',
-            bottom: 'calc(10px + env(safe-area-inset-bottom))',
+            bottom: 'calc(140px + env(safe-area-inset-bottom))',
             zIndex: Z,
             display: 'flex',
             gap: 6,

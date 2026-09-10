@@ -134,10 +134,10 @@ function Joystick({ onChange }: JoystickProps) {
       onTouchStart={handleStart}
       style={{
         position: 'fixed',
-        left: 'max(16px, env(safe-area-inset-left))',
-        bottom: 'calc(84px + env(safe-area-inset-bottom))',
-        width: 118,
-        height: 118,
+        left: 'max(12px, env(safe-area-inset-left))',
+        bottom: 'calc(18px + env(safe-area-inset-bottom))',
+        width: 112,
+        height: 112,
         borderRadius: '50%',
         background: 'rgba(0,0,0,0.28)',
         border: '2px solid rgba(255,255,255,0.22)',
@@ -302,9 +302,9 @@ function ActionButton({
 }
 
 const SAFE_RIGHT = 'calc(16px + env(safe-area-inset-right))';
-const SAFE_RIGHT_OFFSET = 'calc(96px + env(safe-area-inset-right))';
-const SAFE_BOTTOM_LOW = 'calc(16px + env(safe-area-inset-bottom))';
-const SAFE_BOTTOM_JUMP = 'calc(92px + env(safe-area-inset-bottom))';
+const SAFE_RIGHT_OFFSET = 'calc(88px + env(safe-area-inset-right))';
+const SAFE_BOTTOM_LOW = 'calc(18px + env(safe-area-inset-bottom))';
+const SAFE_BOTTOM_JUMP = 'calc(98px + env(safe-area-inset-bottom))';
 
 interface TouchControlsProps {
   enabled: boolean;

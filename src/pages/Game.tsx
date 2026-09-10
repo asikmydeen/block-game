@@ -998,6 +998,7 @@ export default function Game({
         onPing={handlePing}
         nearbyPlayers={nearbyPlayers}
         mpStatus={mode === 'multi' ? mpStatus : undefined}
+        dead={showDeath}
       />
 
       {isFlashing && (
@@ -1010,44 +1011,6 @@ export default function Game({
             zIndex: 150,
           }}
         />
-      )}
-
-      {showDeath && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 300,
-            color: 'white',
-            fontFamily: 'monospace',
-            flexDirection: 'column',
-            gap: 16,
-          }}
-        >
-          <div style={{ fontSize: 40, fontWeight: 'bold', color: '#ff4d4d' }}>YOU DIED</div>
-          <div style={{ color: '#bbb' }}>The zombies got you.</div>
-          <button
-            onClick={handleRespawn}
-            style={{
-              marginTop: 12,
-              background: '#7CFC00',
-              color: '#102',
-              border: 'none',
-              borderRadius: 8,
-              padding: '12px 28px',
-              fontSize: 16,
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              fontFamily: 'monospace',
-            }}
-          >
-            Respawn
-          </button>
-        </div>
       )}
 
       <TouchControls
@@ -1154,6 +1117,54 @@ export default function Game({
       )}
 
       {toastMsg && <Toast message={toastMsg} />}
+
+      {showDeath && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 500,
+            color: 'white',
+            fontFamily: 'monospace',
+            flexDirection: 'column',
+            gap: 16,
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
+          }}
+        >
+          <div style={{ fontSize: 40, fontWeight: 'bold', color: '#ff4d4d' }}>YOU DIED</div>
+          <div style={{ color: '#bbb' }}>The zombies got you.</div>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleRespawn();
+            }}
+            style={{
+              marginTop: 12,
+              background: '#7CFC00',
+              color: '#102',
+              border: 'none',
+              borderRadius: 8,
+              padding: '14px 32px',
+              fontSize: 18,
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              touchAction: 'manipulation',
+              pointerEvents: 'auto',
+            }}
+          >
+            Respawn
+          </button>
+        </div>
+      )}
     </div>
   );
 }
