@@ -115,8 +115,12 @@ Lamplight repels zombies at night. You can fight from animal-back.
 ## Levels
 
 25 timed jobs on a numbered grid (1–25). Free Play is roam-only. Levels mode
-unlocks boxes in order; finish the objective before the clock hits zero.
+unlocks boxes in order; finish the objective before the clock hits zero
+(place blocks, finish a named building, kill, ride, drive, or survive).
 Rewards are shop points.
+
+Building plans (Pad, Wall, Hut, Tower, Garage) drop a whole structure on
+open ground. After it goes up, you name it — the name floats over the building.
 
 ## Multiplayer races
 

@@ -1,5 +1,7 @@
-// Timed levels in the existing city. Free play is roam-only.
-// Solo: sequential unlock. Multiplayer: race the same clock.
+// Timed levels. Free play is roam-only. Objectives are things you DO:
+// place blocks, finish a building, kill, ride, drive, survive.
+
+import type { PlanId } from './buildings';
 
 export type MissionId =
   | 'l01' | 'l02' | 'l03' | 'l04' | 'l05'
@@ -8,20 +10,12 @@ export type MissionId =
   | 'l16' | 'l17' | 'l18' | 'l19' | 'l20'
   | 'l21' | 'l22' | 'l23' | 'l24' | 'l25';
 
-export type MissionKind = 'goto' | 'kills' | 'chests' | 'drive' | 'survive';
+export type MissionKind = 'place' | 'build' | 'kills' | 'ride' | 'drive' | 'survive';
 
 export interface ZombieWave {
   health: number;
   speedMult: number;
   respawn: number;
-}
-
-export interface MissionTarget {
-  x: number;
-  y?: number;
-  z: number;
-  r: number;
-  label: string;
 }
 
 export interface MissionDef {
@@ -35,20 +29,9 @@ export interface MissionDef {
   timeLimit: number;
   count?: number;
   night?: boolean;
-  target?: MissionTarget;
+  plan?: PlanId;
   wave?: ZombieWave;
 }
-
-const PARK = { x: 14, z: 14, r: 6, label: 'Park' };
-const FOREST = { x: 50, z: 0, r: 18, label: 'Forest' };
-const COTTAGE = { x: 22, z: 6, r: 8, label: 'Cottage' };
-const CABIN = { x: -12, z: 18, r: 8, label: 'Cabin' };
-const MODERN = { x: 8, z: -18, r: 8, label: 'Modern house' };
-const EAST = { x: 55, z: 10, r: 10, label: 'East tower' };
-const WEST = { x: -55, z: -10, r: 10, label: 'West tower' };
-const SPIRE = { x: 28, z: -22, r: 8, label: 'Spire' };
-const NORTH_APT = { x: -40, y: 24, z: 40, r: 10, label: 'Rooftop' };
-const SOUTH_APT = { x: 40, z: -40, r: 10, label: 'South block' };
 
 const mild: ZombieWave = { health: 5, speedMult: 1.12, respawn: 4 };
 const hard: ZombieWave = { health: 7, speedMult: 1.25, respawn: 3 };
@@ -78,31 +61,31 @@ function L(
 }
 
 export const MISSIONS: MissionDef[] = [
-  L(1, 'Park', 'Reach the town park pond.', 'Head east of spawn toward the trees and water.', 'goto', 60, { target: PARK }),
-  L(2, 'First Blood', 'Kill 3 zombies.', 'They haunt the forest ring. Follow the waypoint.', 'kills', 75, { count: 3, target: FOREST }),
-  L(3, 'Cottage Stash', 'Loot a chest in the cottage.', 'Cottage east of spawn. Look at the chest and interact.', 'chests', 90, { count: 1, target: COTTAGE }),
-  L(4, 'East Walk', 'Reach the east skyscraper.', 'Follow the road east to the tall tower.', 'goto', 80, { target: EAST }),
-  L(5, 'Hunter', 'Kill 8 zombies.', 'Push out to the treeline and hunt.', 'kills', 90, { count: 8, target: FOREST }),
-  L(6, 'Joyride', 'Drive a car to the east tower.', 'Hop in a parked car and take the east road.', 'drive', 80, { target: EAST }),
-  L(7, 'Cabin Call', 'Reach the north cabin.', 'Northwest of spawn, among the trees.', 'goto', 70, { target: CABIN }),
-  L(8, 'Night Watch', 'Stay alive until dawn.', 'Lamps keep zombies back. Do not die.', 'survive', 40, { night: true }),
-  L(9, 'Two Chests', 'Loot 2 chests.', 'Houses around town all have chests inside.', 'chests', 100, { count: 2, target: COTTAGE }),
-  L(10, 'Treeline', 'Kill 12 zombies.', 'Harder respawns at the forest edge.', 'kills', 90, { count: 12, target: FOREST, wave: mild }),
-  L(11, 'High Rise', 'Reach the north apartment roof.', 'Climb the stairwell. Ground floor does not count.', 'goto', 110, { target: NORTH_APT }),
-  L(12, 'Night Streets', 'Kill 10 zombies at night.', 'Night is locked. Hunt under the lamps.', 'kills', 90, { count: 10, night: true, wave: mild }),
-  L(13, 'West Tower', 'Reach the west skyscraper.', 'Take the west road out of town.', 'goto', 90, { target: WEST }),
-  L(14, 'Cross Town', 'Drive to the west tower.', 'Steal a car and cut across the city.', 'drive', 85, { target: WEST }),
+  L(1, 'Starter', 'Place 12 blocks.', 'Switch to Build, pick a block, tap Place against the ground.', 'place', 90, { count: 12 }),
+  L(2, 'First Blood', 'Kill 3 zombies.', 'Switch to Fight and attack anything that shambles.', 'kills', 75, { count: 3 }),
+  L(3, 'Saddle Up', 'Ride an animal once.', 'Walk up to a pig, chicken, or deer and tap Ride.', 'ride', 80, { count: 1 }),
+  L(4, 'Foundation', 'Build a Pad and name it.', 'Build mode → Plans → Pad. Place it on open ground, then name it.', 'build', 90, { count: 1, plan: 'pad' }),
+  L(5, 'Hunter', 'Kill 8 zombies.', 'Keep swinging. They come from the treeline.', 'kills', 90, { count: 8 }),
+  L(6, 'Keys', 'Get in a car once.', 'Walk up to a parked car and tap Drive.', 'drive', 70, { count: 1 }),
+  L(7, 'Mason', 'Place 30 blocks.', 'Walls, floors, anything. Just place thirty.', 'place', 100, { count: 30 }),
+  L(8, 'Night Watch', 'Stay alive until the clock runs out.', 'Night is on. Lamps keep zombies back.', 'survive', 40, { night: true }),
+  L(9, 'Roundup', 'Ride 2 animals.', 'Mount, hop off, mount another — or the same one twice.', 'ride', 90, { count: 2 }),
+  L(10, 'Treeline', 'Kill 12 zombies.', 'They respawn faster now.', 'kills', 90, { count: 12, wave: mild }),
+  L(11, 'Shed', 'Build a Hut and name it.', 'Plans → Hut. Needs a clear patch of ground.', 'build', 120, { count: 1, plan: 'hut' }),
+  L(12, 'Night Streets', 'Kill 10 zombies at night.', 'Fight after dark. Keep near lamps if you get swarmed.', 'kills', 90, { count: 10, night: true, wave: mild }),
+  L(13, 'Brickwork', 'Place 50 blocks.', 'A small house worth of blocks. Any type counts.', 'place', 110, { count: 50 }),
+  L(14, 'Taxi', 'Get in 2 cars.', 'Enter, exit, enter again — wrecks still count if you can get in.', 'drive', 90, { count: 2 }),
   L(15, 'Blackout', 'Survive the night.', 'Tougher zombies. Keep moving.', 'survive', 50, { night: true, wave: hard }),
-  L(16, 'Modern Haul', 'Loot a chest in the modern house.', 'South of spawn, glass and concrete.', 'chests', 80, { count: 1, target: MODERN }),
-  L(17, 'Culling', 'Kill 15 zombies.', 'Clear a path through the forest ring.', 'kills', 100, { count: 15, target: FOREST, wave: hard }),
-  L(18, 'South Block', 'Reach the south apartment.', 'Southeast treeline, the long housing block.', 'goto', 90, { target: SOUTH_APT }),
-  L(19, 'Park Circuit', 'Drive back to the park.', 'Find a car and return to the pond.', 'drive', 70, { target: PARK }),
-  L(20, 'Midnight Hunt', 'Kill 18 zombies at night.', 'Fast respawns. Do not get surrounded.', 'kills', 110, { count: 18, night: true, wave: hard }),
-  L(21, 'The Spire', 'Reach the south tower.', 'The tall house south-east of spawn.', 'goto', 100, { target: SPIRE }),
-  L(22, 'Treasure Run', 'Loot 3 chests.', 'Hit three different houses before time runs out.', 'chests', 120, { count: 3, target: COTTAGE }),
+  L(16, 'Barricade', 'Build a Wall and name it.', 'Plans → Wall. Drop it as a stone barricade.', 'build', 100, { count: 1, plan: 'wall' }),
+  L(17, 'Culling', 'Kill 15 zombies.', 'Harder wave. Do not get surrounded.', 'kills', 100, { count: 15, wave: hard }),
+  L(18, 'Wrangler', 'Ride 3 animals.', 'Pig, chicken, deer — any mix.', 'ride', 100, { count: 3 }),
+  L(19, 'Lookout', 'Build a Tower and name it.', 'Plans → Tower. Needs vertical clearance.', 'build', 120, { count: 1, plan: 'tower' }),
+  L(20, 'Midnight Hunt', 'Kill 18 zombies at night.', 'Fast respawns after dark.', 'kills', 110, { count: 18, night: true, wave: hard }),
+  L(21, 'Workshop', 'Build a Garage and name it.', 'Plans → Garage. Open front, metal roof.', 'build', 120, { count: 1, plan: 'garage' }),
+  L(22, 'Foreman', 'Place 80 blocks.', 'Go big. Any blocks count.', 'place', 120, { count: 80 }),
   L(23, 'Hold Fast', 'Survive a hard night.', 'Brutal wave. Lamps still help.', 'survive', 60, { night: true, wave: brutal }),
-  L(24, 'Onslaught', 'Kill 25 zombies.', 'Keep the pressure on. They come back fast.', 'kills', 120, { count: 25, target: FOREST, wave: brutal }),
-  L(25, 'Last Light', 'Kill 30 zombies before the clock hits zero.', 'Final hunt. Night, brutal wave, no mercy.', 'kills', 90, { count: 30, night: true, wave: brutal, target: FOREST }),
+  L(24, 'Onslaught', 'Kill 25 zombies.', 'They come back fast.', 'kills', 120, { count: 25, wave: brutal }),
+  L(25, 'Last Light', 'Kill 30 zombies at night.', 'Final hunt. Night, brutal wave.', 'kills', 90, { count: 30, night: true, wave: brutal }),
 ];
 
 export const MISSION_ORDER: MissionId[] = MISSIONS.map((m) => m.id);
@@ -166,7 +149,6 @@ export function mergeMissions(...lists: Array<Iterable<string> | undefined | nul
   return s;
 }
 
-/** Seconds per level — keep in sync with MISSIONS (used by the MP server copy). */
 export const LEVEL_TIME: Record<MissionId, number> = Object.fromEntries(
   MISSIONS.map((m) => [m.id, m.timeLimit])
 ) as Record<MissionId, number>;

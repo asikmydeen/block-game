@@ -6,6 +6,7 @@ import { CAR_SPECS, type CarInfo, type CarKind } from '../game/cars';
 import { RIDE_SPECS, type RideableKind } from '../game/animals';
 import type { PlayStance } from './TouchControls';
 import { BlockCube, HudIcon, HudRoundButton, WEAPON_GLYPH } from './HudIcons';
+import { BUILDING_PLANS, type PlanId } from '../game/buildings';
 import * as THREE from 'three';
 
 const Z = 200;
@@ -75,6 +76,8 @@ interface GameUIProps {
   nearbyPlayers: NearbyPlayer[];
   mpStatus?: { status: 'connecting' | 'online' | 'offline'; count: number };
   dead?: boolean;
+  selectedPlan: PlanId | null;
+  onSelectPlan: (p: PlanId | null) => void;
 }
 
 function Heart({ state, size = 18 }: { state: 'full' | 'half' | 'empty'; size?: number }) {
@@ -173,9 +176,11 @@ export function GameUI({
   nearbyPlayers,
   mpStatus,
   dead,
+  selectedPlan,
+  onSelectPlan,
 }: GameUIProps) {
   const [pausePanel, setPausePanel] = useState<'root' | 'help'>('root');
-  const [sheet, setSheet] = useState<null | 'block' | 'weapon'>(null);
+  const [sheet, setSheet] = useState<null | 'block' | 'weapon' | 'plan'>(null);
 
   const playing = started && !dead && (touchMode || isLocked || paused);
   const driving = !!carInfo;
@@ -421,6 +426,16 @@ export function GameUI({
               )}
             </HudRoundButton>
           )}
+          {!driving && playStance === 'build' && (
+            <HudRoundButton
+              glyph="cube"
+              title={selectedPlan ? `Plan: ${BUILDING_PLANS.find((p) => p.id === selectedPlan)?.name}` : 'Building plans'}
+              onPress={() => setSheet('plan')}
+              size={46}
+              active={!!selectedPlan}
+              accent={selectedPlan ? 'rgba(40,90,50,0.95)' : 'rgba(18,22,28,0.78)'}
+            />
+          )}
           {context && (
             <HudRoundButton
               glyph={context.glyph}
@@ -450,6 +465,18 @@ export function GameUI({
               border: '1px solid rgba(255,255,255,0.15)',
             }}
           >
+            <button
+              type="button"
+              onClick={() => setSheet('plan')}
+              style={{
+                ...chromeBtn,
+                padding: '6px 10px',
+                fontSize: 11,
+                background: selectedPlan ? 'rgba(46,139,87,0.4)' : 'rgba(255,255,255,0.08)',
+              }}
+            >
+              {selectedPlan ? BUILDING_PLANS.find((p) => p.id === selectedPlan)?.name : 'Plans'}
+            </button>
             {PLACEABLE_BLOCKS.map((block, i) => (
               <div
                 key={block}
@@ -622,6 +649,65 @@ export function GameUI({
                 </button>
               );
             })}
+          </div>
+        </SheetScrim>
+      )}
+
+      {sheet === 'plan' && (
+        <SheetScrim onClose={() => setSheet(null)}>
+          <div
+            style={{
+              background: 'rgba(12,14,18,0.95)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              borderRadius: 12,
+              padding: 12,
+              width: 'min(420px, 94vw)',
+              color: 'white',
+              fontFamily: 'monospace',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#ffd76a' }}>Building plans</div>
+            <div style={{ fontSize: 11, color: '#8a94a5', marginBottom: 10 }}>
+              Pick a plan, aim at open ground, Place. Then name it.
+            </div>
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                onSelectPlan(null);
+                setSheet(null);
+              }}
+              style={{
+                ...chromeBtn,
+                width: '100%',
+                marginBottom: 8,
+                background: selectedPlan === null ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+              }}
+            >
+              Blocks only
+            </button>
+            {BUILDING_PLANS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  onSelectPlan(p.id);
+                  onPlayStance('build');
+                  setSheet(null);
+                }}
+                style={{
+                  ...chromeBtn,
+                  width: '100%',
+                  marginBottom: 6,
+                  background: selectedPlan === p.id ? 'rgba(46,139,87,0.35)' : 'rgba(255,255,255,0.04)',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ fontWeight: 'bold' }}>{p.name}</div>
+                <div style={{ fontSize: 11, color: '#8a94a5' }}>{p.blurb}</div>
+              </button>
+            ))}
           </div>
         </SheetScrim>
       )}
@@ -881,6 +967,7 @@ function HelpList({ touchMode }: { touchMode: boolean }) {
         <div>Jump / Attack / Place — actions</div>
         <div>Sword or cube on the right — Fight or Build</div>
         <div>Tap the item — switch block / weapon</div>
+        <div>Plans — drop a Pad, Wall, Hut, Tower, or Garage, then name it</div>
         <div>Car / mount / wrench — when nearby</div>
         <div>Pause — levels, camera, day/night</div>
         <div style={{ color: '#8affc1' }}>Kill zombies — earn points</div>

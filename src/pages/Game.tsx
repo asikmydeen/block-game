@@ -8,6 +8,7 @@ import { Player, type CameraMode } from '../components/Player';
 import { GameUI, type NearCar } from '../components/GameUI';
 import { TouchControls, isTouchDevice, type PlayStance } from '../components/TouchControls';
 import { WaypointMarker } from '../components/WaypointMarker';
+import { BuildingGhost, NamedBuildingLabels } from '../components/BuildingsView';
 import { Villagers } from '../components/Villagers';
 import { Zombies } from '../components/Zombies';
 import { BlockType } from '../game/terrain';
@@ -40,6 +41,15 @@ import {
 } from '../game/missions';
 import { mpBridge, RACE_IDLE, type MpPlayerInfo, type PingEvent, type RaceState } from '../game/mpBridge';
 import { LevelSelect, type LevelBox } from '../components/LevelSelect';
+import {
+  BUILDING_PLANS,
+  getPlan,
+  loadBuildings,
+  saveBuildings,
+  stampPlan,
+  type NamedBuilding,
+  type PlanId,
+} from '../game/buildings';
 
 export type GameMode = 'free' | 'levels' | 'multi';
 
@@ -79,6 +89,8 @@ function GameScene({
   night,
   wave,
   waypoints,
+  planId,
+  namedBuildings,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
@@ -99,6 +111,8 @@ function GameScene({
   night: boolean;
   wave?: ZombieWave | null;
   waypoints?: Array<{ x: number; y: number; z: number; label: string; color?: string }>;
+  planId?: PlanId | null;
+  namedBuildings?: NamedBuilding[];
 }) {
   const bgColor = night ? '#0a1024' : '#87CEEB';
   const fogArgs: [string, number, number] = night
@@ -175,6 +189,10 @@ function GameScene({
           color={w.color}
         />
       ))}
+      <BuildingGhost world={world} planId={planId ?? null} />
+      {namedBuildings && namedBuildings.length > 0 && (
+        <NamedBuildingLabels buildings={namedBuildings} />
+      )}
       <Player
         world={world}
         onBlockInteract={onBlockInteract}
@@ -237,6 +255,12 @@ export default function Game({
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [pingMark, setPingMark] = useState<{ x: number; y: number; z: number; from: string; until: number } | null>(null);
   const [mpPlayers, setMpPlayers] = useState<MpPlayerInfo[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
+  const [namedBuildings, setNamedBuildings] = useState<NamedBuilding[]>(() => loadBuildings(account.id));
+  const [pendingBuild, setPendingBuild] = useState<{ plan: PlanId; x: number; y: number; z: number } | null>(null);
+  const [buildName, setBuildName] = useState('');
+  const selectedPlanRef = useRef<PlanId | null>(null);
+  selectedPlanRef.current = selectedPlan;
   // Score and unlocked weapons are restored from the signed-in account.
   const [score, setScore] = useState(() => account.score ?? 0);
   const [ownedWeapons, setOwnedWeapons] = useState<ReadonlySet<WeaponType>>(
@@ -460,6 +484,8 @@ export default function Game({
     setShowLevelSelect(false);
     setPaused(false);
     setNight(!!def.night);
+    if (def.kind === 'place' || def.kind === 'build') setPlayStance('build');
+    if (def.kind === 'build' && def.plan) setSelectedPlan(def.plan);
     playerPosRef.current.set(8, 18, 8);
     setRespawnSignal((s) => s + 1);
     healthRef.current = powerState.maxHealth;
@@ -504,8 +530,6 @@ export default function Game({
       setChestLoot(generateLoot(powerState.lootLuck));
       setChestOpen(true);
       if (document.pointerLockElement) document.exitPointerLock();
-      const mid = activeMissionRef.current;
-      if (mid && getMission(mid).kind === 'chests') setMissionCount(c => c + 1);
     } else if (bt === 'bed') {
       healthRef.current = powerState.maxHealth;
       setHealth(powerState.maxHealth);
@@ -600,6 +624,9 @@ export default function Game({
         const res = carsRegistry.toggleDrive?.(playerPosRef.current);
         if (res === 'occupied') {
           showToastRef.current?.('That car already has a driver!');
+        } else if (res === 'entered') {
+          const mid = activeMissionRef.current;
+          if (mid && getMission(mid).kind === 'drive') setMissionCount((c) => c + 1);
         } else if (!res) {
           toggleRideRef.current?.();
         }
@@ -640,8 +667,11 @@ export default function Game({
 
   const toggleRide = useCallback(() => {
     const res = animalsRegistry.toggleRide?.(playerPosRef.current);
-    if (res === 'mounted') setRiding(true);
-    else if (res === 'dismounted') setRiding(false);
+    if (res === 'mounted') {
+      setRiding(true);
+      const mid = activeMissionRef.current;
+      if (mid && getMission(mid).kind === 'ride') setMissionCount((c) => c + 1);
+    } else if (res === 'dismounted') setRiding(false);
     return res ?? null;
   }, []);
 
@@ -653,6 +683,9 @@ export default function Game({
     const res = carsRegistry.toggleDrive?.(playerPosRef.current);
     if (res === 'occupied') {
       showToast('That car already has a driver!');
+    } else if (res === 'entered') {
+      const mid = activeMissionRef.current;
+      if (mid && getMission(mid).kind === 'drive') setMissionCount((c) => c + 1);
     }
   }, [showToast]);
 
@@ -709,18 +742,16 @@ export default function Game({
       else failLevel('Time is up.');
       return;
     }
-    const pos = playerPosRef.current;
-    if (def.kind === 'goto' && def.target) {
-      const dist = Math.hypot(pos.x - def.target.x, pos.z - def.target.z);
-      const yOk = def.target.y == null || pos.y >= def.target.y - 2;
-      if (dist <= def.target.r && yOk) completeMission(id);
+    if (
+      (def.kind === 'kills' ||
+        def.kind === 'place' ||
+        def.kind === 'build' ||
+        def.kind === 'ride' ||
+        def.kind === 'drive') &&
+      missionCount >= (def.count ?? 1)
+    ) {
+      completeMission(id);
     }
-    if (def.kind === 'drive' && def.target && drivingState.active) {
-      const dist = Math.hypot(pos.x - def.target.x, pos.z - def.target.z);
-      if (dist <= def.target.r) completeMission(id);
-    }
-    if (def.kind === 'kills' && missionCount >= (def.count ?? 1)) completeMission(id);
-    if (def.kind === 'chests' && missionCount >= (def.count ?? 1)) completeMission(id);
   }, [nowMs, activeMission, missionCount, levelEndsAt, completeMission, failLevel]);
 
   const lastRaceKey = useRef('');
@@ -764,10 +795,32 @@ export default function Game({
   ) => {
     if (type === 'break') {
       world.setBlock(wx, wy, wz, 'air');
-    } else if (type === 'place' && blockType) {
-      world.setBlock(wx, wy, wz, blockType);
+      return;
     }
-  }, [world]);
+    if (type !== 'place') return;
+    const planId = selectedPlanRef.current;
+    if (planId) {
+      const stamped = stampPlan(world, getPlan(planId), wx, wy, wz);
+      if (!stamped) {
+        showToast('Need a clear patch of ground for that plan.');
+        return;
+      }
+      setBuildName(getPlan(planId).name);
+      setPendingBuild({ plan: planId, x: stamped.x, y: stamped.y, z: stamped.z });
+      document.exitPointerLock?.();
+      const mid = activeMissionRef.current;
+      if (mid) {
+        const def = getMission(mid);
+        if (def.kind === 'place') setMissionCount((c) => c + stamped.count);
+      }
+      return;
+    }
+    if (blockType) {
+      world.setBlock(wx, wy, wz, blockType);
+      const mid = activeMissionRef.current;
+      if (mid && getMission(mid).kind === 'place') setMissionCount((c) => c + 1);
+    }
+  }, [world, showToast]);
 
   const handlePositionChange = useCallback((pos: THREE.Vector3) => {
     setPlayerPos(pos.clone());
@@ -802,12 +855,8 @@ export default function Game({
     if (pingMark && pingMark.until > nowMs) {
       list.push({ x: pingMark.x, y: pingMark.y, z: pingMark.z, label: pingMark.from, color: '#5ad1ff' });
     }
-    if (activeMission) {
-      const t = getMission(activeMission).target;
-      if (t) list.push({ x: t.x, y: t.y ?? 13, z: t.z, label: t.label });
-    }
     return list;
-  }, [pingMark, nowMs, activeMission]);
+  }, [pingMark, nowMs]);
 
   const objective = useMemo(() => {
     if (!activeMission) return null;
@@ -815,10 +864,11 @@ export default function Game({
     const remain = formatClock((levelEndsAt - nowMs) / 1000);
     let detail = def.blurb;
     if (def.kind === 'kills') detail = `${missionCount}/${def.count ?? 0} kills`;
-    if (def.kind === 'chests') detail = `${missionCount}/${def.count ?? 1} chests`;
+    if (def.kind === 'place') detail = `${missionCount}/${def.count ?? 0} blocks`;
+    if (def.kind === 'build') detail = `Build a ${getPlan(def.plan ?? 'pad').name} · ${missionCount}/${def.count ?? 1}`;
+    if (def.kind === 'ride') detail = `${missionCount}/${def.count ?? 1} rides`;
+    if (def.kind === 'drive') detail = `${missionCount}/${def.count ?? 1} cars`;
     if (def.kind === 'survive') detail = 'Stay alive';
-    if (def.kind === 'goto' && def.target) detail = `Go to ${def.target.label}`;
-    if (def.kind === 'drive' && def.target) detail = `Drive to ${def.target.label}`;
     const raceNote =
       mode === 'multi' && race.winner
         ? ` · ${race.winner} wins`
@@ -869,6 +919,34 @@ export default function Game({
     },
     [startLevel]
   );
+
+  const confirmBuildingName = useCallback(() => {
+    if (!pendingBuild) return;
+    const name = buildName.trim() || getPlan(pendingBuild.plan).name;
+    const rec: NamedBuilding = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      plan: pendingBuild.plan,
+      x: pendingBuild.x,
+      y: pendingBuild.y,
+      z: pendingBuild.z,
+    };
+    setNamedBuildings((prev) => {
+      const next = [...prev, rec];
+      saveBuildings(account.id, next);
+      return next;
+    });
+    const mid = activeMissionRef.current;
+    if (mid) {
+      const def = getMission(mid);
+      if (def.kind === 'build' && (!def.plan || def.plan === pendingBuild.plan)) {
+        setMissionCount((c) => c + 1);
+      }
+    }
+    setPendingBuild(null);
+    showToast(`${name} complete.`);
+    if (!touchMode) canvasElRef.current?.requestPointerLock();
+  }, [pendingBuild, buildName, account.id, showToast, touchMode]);
 
   if (webglError) {
     return (
@@ -928,6 +1006,8 @@ export default function Game({
               night={night}
               wave={zombieWave}
               waypoints={waypoints}
+              planId={playStance === 'build' ? selectedPlan : null}
+              namedBuildings={namedBuildings}
             />
             {mode === 'multi' && (
               <RemotePlayers
@@ -988,6 +1068,8 @@ export default function Game({
         nearbyPlayers={nearbyPlayers}
         mpStatus={mode === 'multi' ? mpStatus : undefined}
         dead={showDeath}
+        selectedPlan={selectedPlan}
+        onSelectPlan={setSelectedPlan}
       />
 
       {started && !showDeath && !paused && showLevelSelect && mode !== 'free' && (
@@ -1016,7 +1098,7 @@ export default function Game({
       )}
 
       <TouchControls
-        enabled={touchMode && started && !showDeath && !paused && !shopOpen && !showLevelSelect}
+        enabled={touchMode && started && !showDeath && !paused && !shopOpen && !showLevelSelect && !pendingBuild}
         stance={playStance}
         driving={!!carInfo}
       />
@@ -1119,6 +1201,76 @@ export default function Game({
       )}
 
       {toastMsg && <Toast message={toastMsg} />}
+
+      {pendingBuild && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            zIndex: 480,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            fontFamily: 'monospace',
+          }}
+        >
+          <div
+            style={{
+              background: '#12161f',
+              border: '2px solid rgba(255,215,106,0.4)',
+              borderRadius: 14,
+              padding: 18,
+              width: 'min(360px, 94vw)',
+              color: 'white',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', color: '#ffd76a', marginBottom: 8 }}>Name this building</div>
+            <div style={{ fontSize: 12, color: '#8a94a5', marginBottom: 10 }}>
+              {getPlan(pendingBuild.plan).name} is up. Give it a name.
+            </div>
+            <input
+              autoFocus
+              value={buildName}
+              maxLength={24}
+              onChange={(e) => setBuildName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmBuildingName();
+              }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: '#0c1016',
+                color: 'white',
+                fontFamily: 'monospace',
+                fontSize: 16,
+                marginBottom: 12,
+              }}
+            />
+            <button
+              type="button"
+              onClick={confirmBuildingName}
+              style={{
+                width: '100%',
+                background: '#2e8b57',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                padding: '12px 14px',
+                fontFamily: 'monospace',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {showDeath && (
         <div
