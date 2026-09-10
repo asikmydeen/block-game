@@ -1052,8 +1052,8 @@ export default function Game({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 'bold', color: '#ffd76a' }}>🔫 Weapon Shop</div>
-              <div style={{ fontSize: 14, color: '#8affc1' }}>⭐ {score} pts</div>
+              <div style={{ fontSize: 18, fontWeight: 'bold', color: '#ffd76a' }}>Weapon Shop</div>
+              <div style={{ fontSize: 14, color: '#8affc1' }}>{score} pts</div>
             </div>
             <div style={{ fontSize: 11, color: '#8a94a5' }}>
               Kill zombies to earn points ({KILL_POINTS} per kill). Press B or Esc to close.
@@ -1100,7 +1100,7 @@ export default function Game({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {owned ? (weapon === w.id ? 'Equipped' : 'Equip') : `⭐ ${w.cost}`}
+                    {owned ? (weapon === w.id ? 'Equipped' : 'Equip') : `${w.cost}`}
                   </button>
                 </div>
               );

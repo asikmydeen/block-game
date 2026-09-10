@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { HudIcon, type HudGlyph } from './HudIcons';
 
 export type PlayStance = 'fight' | 'build';
 
@@ -239,6 +240,7 @@ function LookPad() {
 }
 
 interface ActionButtonProps {
+  glyph: HudGlyph;
   label: string;
   bottom: string;
   right: string;
@@ -249,6 +251,7 @@ interface ActionButtonProps {
 }
 
 function ActionButton({
+  glyph,
   label,
   bottom,
   right,
@@ -260,6 +263,8 @@ function ActionButton({
   const [pressed, setPressed] = useState(false);
   return (
     <div
+      role="button"
+      aria-label={label}
       onTouchStart={(e) => {
         e.preventDefault();
         setPressed(true);
@@ -282,21 +287,18 @@ function ActionButton({
         height: size,
         borderRadius: '50%',
         background: pressed ? 'rgba(255,255,255,0.45)' : color,
-        border: '2px solid rgba(255,255,255,0.5)',
+        border: '2px solid rgba(255,255,255,0.45)',
         color: 'white',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'monospace',
-        fontSize: size > 68 ? 13 : 12,
-        fontWeight: 'bold',
         zIndex: 210,
         touchAction: 'none',
         userSelect: 'none',
-        textShadow: '1px 1px 2px black',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
       }}
     >
-      {label}
+      <HudIcon name={glyph} size={Math.round(size * 0.42)} />
     </div>
   );
 }
@@ -325,7 +327,8 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
         }}
       />
       <ActionButton
-        label={driving ? 'BRAKE' : 'JUMP'}
+        glyph={driving ? 'brake' : 'jump'}
+        label={driving ? 'Brake' : 'Jump'}
         bottom={SAFE_BOTTOM_JUMP}
         right={SAFE_RIGHT}
         size={72}
@@ -339,7 +342,8 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
       />
       {!driving && (
         <ActionButton
-          label={stance === 'build' ? 'BREAK' : 'ATK'}
+          glyph="attack"
+          label={stance === 'build' ? 'Break' : 'Attack'}
           bottom={SAFE_BOTTOM_LOW}
           right={SAFE_RIGHT_OFFSET}
           size={64}
@@ -351,7 +355,8 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
       )}
       {!driving && stance === 'build' && (
         <ActionButton
-          label="PLACE"
+          glyph="place"
+          label="Place"
           bottom={SAFE_BOTTOM_LOW}
           right={SAFE_RIGHT}
           size={64}

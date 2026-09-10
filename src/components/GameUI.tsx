@@ -7,17 +7,8 @@ import { RIDE_SPECS, type RideableKind } from '../game/animals';
 import type { PlayStance } from './TouchControls';
 import type { MissionId } from '../game/missions';
 import type { RaidState } from '../game/mpBridge';
+import { BlockCube, HudIcon, HudRoundButton, WEAPON_GLYPH } from './HudIcons';
 import * as THREE from 'three';
-
-const WEAPON_ICONS: Record<WeaponType, string> = {
-  hand: '✊',
-  sword: '🗡️',
-  axe: '🪓',
-  katana: '⚔️',
-  blaster: '🔫',
-  shotgun: '💥',
-  rifle: '🎯',
-};
 
 const Z = 200;
 
@@ -137,48 +128,6 @@ function Hearts({ health, maxHealth, size = 18 }: { health: number; maxHealth: n
   );
 }
 
-function Chip({
-  children,
-  onClick,
-  active,
-  title,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  active?: boolean;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick();
-      }}
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 8,
-        border: active ? '2px solid #fff' : '2px solid rgba(255,255,255,0.25)',
-        background: 'rgba(0,0,0,0.45)',
-        color: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        fontFamily: 'monospace',
-        padding: 0,
-        touchAction: 'none',
-        transform: active ? 'scale(1.06)' : 'scale(1)',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 function SheetScrim({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
     <div
@@ -256,17 +205,17 @@ export function GameUI({
   const playing = started && !dead && (touchMode || isLocked || paused);
   const driving = !!carInfo;
 
-  let context: { label: string; color: string; action: () => void } | null = null;
+  let context: { title: string; glyph: 'exit' | 'car' | 'mount' | 'wrench'; color: string; action: () => void } | null = null;
   if (carInfo) {
-    context = { label: 'EXIT 🚗', color: 'rgba(200,60,60,0.82)', action: onCarButton };
+    context = { title: 'Exit vehicle', glyph: 'exit', color: 'rgba(160,40,40,0.9)', action: onCarButton };
   } else if (riding) {
-    context = { label: 'OFF 🐾', color: 'rgba(200,60,60,0.82)', action: onRideButton };
+    context = { title: 'Dismount', glyph: 'exit', color: 'rgba(160,40,40,0.9)', action: onRideButton };
   } else if (nearCar && !nearCar.broken) {
-    context = { label: `DRIVE 🚗`, color: 'rgba(50,110,190,0.82)', action: onCarButton };
+    context = { title: `Drive ${CAR_SPECS[nearCar.kind].name}`, glyph: 'car', color: 'rgba(36,90,160,0.9)', action: onCarButton };
   } else if (nearAnimal) {
-    context = { label: 'RIDE 🐾', color: 'rgba(80,160,80,0.82)', action: onRideButton };
+    context = { title: `Ride ${RIDE_SPECS[nearAnimal].name}`, glyph: 'mount', color: 'rgba(46,120,70,0.9)', action: onRideButton };
   } else if (nearCar?.broken) {
-    context = { label: 'FIX 🔧', color: 'rgba(190,150,40,0.82)', action: onRepairButton };
+    context = { title: `Repair ${CAR_SPECS[nearCar.kind].name}`, glyph: 'wrench', color: 'rgba(160,120,30,0.9)', action: onRepairButton };
   }
 
   const raidActive = raid && raid.phase !== 'idle';
@@ -327,8 +276,9 @@ export function GameUI({
             }}
           >
             <Hearts health={health} maxHealth={maxHealth} size={touchMode ? 16 : 20} />
-            <div style={{ color: '#ffd76a', fontFamily: 'monospace', fontWeight: 'bold', fontSize: 14, textShadow: '1px 1px 2px #000' }}>
-              ⭐ {score}
+            <div style={{ color: '#ffd76a', fontFamily: 'monospace', fontWeight: 'bold', fontSize: 14, textShadow: '1px 1px 2px #000', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <HudIcon name="star" size={14} color="#ffd76a" />
+              {score}
             </div>
           </div>
           {objective && (
@@ -369,38 +319,22 @@ export function GameUI({
               style={{
                 background: 'rgba(0,0,0,0.5)',
                 color: mpStatus.status === 'online' ? '#8affc1' : mpStatus.status === 'connecting' ? '#ffd24d' : '#ff8a8a',
-                padding: '6px 10px',
+                padding: '6px 8px',
                 borderRadius: 8,
                 fontFamily: 'monospace',
                 fontSize: 12,
                 pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
               }}
             >
-              {mpStatus.status === 'online' ? `🌐 ${mpStatus.count}` : mpStatus.status === 'connecting' ? '🌐 …' : '🌐 off'}
+              <HudIcon name="players" size={14} color="currentColor" />
+              {mpStatus.status === 'online' ? mpStatus.count : mpStatus.status === 'connecting' ? '…' : 'off'}
             </div>
           )}
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpenShop();
-            }}
-            style={{ ...chromeBtn, background: 'rgba(201,165,61,0.4)', borderColor: 'rgba(255,215,106,0.5)' }}
-          >
-            🛒
-          </button>
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openPause();
-            }}
-            style={chromeBtn}
-          >
-            ☰
-          </button>
+          <HudRoundButton glyph="shop" title="Shop" onPress={onOpenShop} size={42} accent="rgba(90,70,20,0.85)" glyphColor="#ffd76a" />
+          <HudRoundButton glyph="pause" title="Pause" onPress={openPause} size={42} />
         </div>
       )}
 
@@ -443,8 +377,9 @@ export function GameUI({
             pointerEvents: 'none',
           }}
         >
-          <div style={{ marginBottom: 4, color: '#ffd24d' }}>
-            🚗 {CAR_SPECS[carInfo.kind].name}{carInfo.broken ? ' — BROKEN' : ''}
+          <div style={{ marginBottom: 4, color: '#ffd24d', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <HudIcon name="car" size={16} color="#ffd24d" />
+            {CAR_SPECS[carInfo.kind].name}{carInfo.broken ? ' — BROKEN' : ''}
           </div>
           <div style={{ width: '100%', height: 8, background: '#3a0a0a', borderRadius: 4, overflow: 'hidden' }}>
             <div
@@ -476,104 +411,54 @@ export function GameUI({
         <Prompt>Press E to ride the {RIDE_SPECS[nearAnimal].name}</Prompt>
       )}
 
-      {playing && touchMode && context && (
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            context!.action();
-          }}
-          style={{
-            position: 'fixed',
-            right: 'max(16px, env(safe-area-inset-right))',
-            bottom: 'calc(186px + env(safe-area-inset-bottom))',
-            zIndex: 220,
-            background: context.color,
-            color: 'white',
-            border: '1px solid rgba(255,255,255,0.35)',
-            borderRadius: 12,
-            padding: '12px 16px',
-            fontFamily: 'monospace',
-            fontSize: 14,
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            touchAction: 'none',
-            minWidth: 92,
-          }}
-        >
-          {context.label}
-        </button>
-      )}
-
-      {playing && touchMode && !driving && (
+      {playing && touchMode && (
         <div
           style={{
             position: 'fixed',
-            left: 'max(12px, env(safe-area-inset-left))',
-            bottom: 'calc(140px + env(safe-area-inset-bottom))',
-            zIndex: Z,
+            right: 'max(14px, env(safe-area-inset-right))',
+            top: 'calc(62px + env(safe-area-inset-top))',
+            zIndex: 220,
             display: 'flex',
-            gap: 6,
+            flexDirection: 'column',
             alignItems: 'center',
+            gap: 10,
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              background: 'rgba(0,0,0,0.5)',
-              borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.18)',
-              overflow: 'hidden',
-            }}
-          >
-            {(['fight', 'build'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onPlayStance(s);
-                  setSheet(null);
-                }}
-                style={{
-                  background: playStance === s ? 'rgba(255,255,255,0.2)' : 'transparent',
-                  color: playStance === s ? '#fff' : '#9aa',
-                  border: 'none',
-                  padding: '8px 10px',
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  touchAction: 'none',
-                }}
-              >
-                {s === 'fight' ? '⚔️' : '🧱'}
-              </button>
-            ))}
-          </div>
-          {playStance === 'build' ? (
-            <Chip title={BLOCK_NAMES[selectedBlock]} active onClick={() => setSheet('block')}>
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 4,
-                  background: BLOCK_COLORS[selectedBlock],
-                  display: 'block',
-                  border: '1px solid rgba(255,255,255,0.35)',
-                }}
-              />
-            </Chip>
-          ) : (
-            <Chip
-              title={WEAPONS.find((w) => w.id === weapon)?.name}
+          {!driving && (
+            <HudRoundButton
+              glyph={playStance === 'build' ? 'cube' : 'sword'}
+              title={playStance === 'build' ? 'Build mode' : 'Fight mode'}
+              onPress={() => {
+                onPlayStance(playStance === 'fight' ? 'build' : 'fight');
+                setSheet(null);
+              }}
+              size={50}
               active
-              onClick={() => setSheet('weapon')}
+              accent={playStance === 'build' ? 'rgba(40,90,50,0.9)' : 'rgba(90,40,40,0.9)'}
+            />
+          )}
+          {!driving && (
+            <HudRoundButton
+              title={playStance === 'build' ? BLOCK_NAMES[selectedBlock] : (WEAPONS.find((w) => w.id === weapon)?.name ?? 'Weapon')}
+              onPress={() => setSheet(playStance === 'build' ? 'block' : 'weapon')}
+              size={54}
+              active
             >
-              <span style={{ fontSize: 22 }}>{WEAPON_ICONS[weapon]}</span>
-            </Chip>
+              {playStance === 'build' ? (
+                <BlockCube color={BLOCK_COLORS[selectedBlock]} size={28} />
+              ) : (
+                <HudIcon name={WEAPON_GLYPH[weapon]} size={26} />
+              )}
+            </HudRoundButton>
+          )}
+          {context && (
+            <HudRoundButton
+              glyph={context.glyph}
+              title={context.title}
+              onPress={context.action}
+              size={50}
+              accent={context.color}
+            />
           )}
         </div>
       )}
@@ -641,7 +526,7 @@ export function GameUI({
                   <div
                     key={w.id}
                     onClick={() => (owned ? onSelectWeapon(w.id) : onOpenShop())}
-                    title={owned ? w.name : `${w.name} — ⭐ ${w.cost} in the shop`}
+                    title={owned ? w.name : `${w.name} — ${w.cost} in the shop`}
                     style={{
                       width: 44,
                       height: 44,
@@ -653,14 +538,15 @@ export function GameUI({
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: owned ? 22 : 15,
                       transform: weapon === w.id ? 'scale(1.1)' : 'scale(1)',
                       opacity: owned ? 1 : 0.55,
                     }}
                   >
-                    {owned ? WEAPON_ICONS[w.id] : (
+                    {owned ? (
+                      <HudIcon name={WEAPON_GLYPH[w.id]} size={22} />
+                    ) : (
                       <>
-                        <span style={{ fontSize: 14 }}>🔒</span>
+                        <HudIcon name="lock" size={16} color="#8a94a5" />
                         <span style={{ fontSize: 8, color: '#ffd24d', fontFamily: 'monospace' }}>{w.cost}</span>
                       </>
                     )}
@@ -700,10 +586,15 @@ export function GameUI({
                   height: 48,
                   borderRadius: 6,
                   border: selectedBlock === block ? '2px solid #fff' : '2px solid rgba(255,255,255,0.25)',
-                  background: BLOCK_COLORS[block],
+                  background: 'rgba(255,255,255,0.06)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
                 title={BLOCK_NAMES[block]}
-              />
+              >
+                <BlockCube color={BLOCK_COLORS[block]} size={30} />
+              </div>
             ))}
           </div>
         </SheetScrim>
@@ -753,7 +644,11 @@ export function GameUI({
                   }}
                   title={owned ? w.name : `${w.name} — shop`}
                 >
-                  {owned ? WEAPON_ICONS[w.id] : '🔒'}
+                  {owned ? (
+                    <HudIcon name={WEAPON_GLYPH[w.id]} size={26} />
+                  ) : (
+                    <HudIcon name="lock" size={22} color="#8a94a5" />
+                  )}
                 </button>
               );
             })}
@@ -836,7 +731,7 @@ export function GameUI({
                   </div>
                 )}
                 <PauseBtn onClick={closePause} primary>Resume</PauseBtn>
-                <PauseBtn onClick={() => setPausePanel('missions')}>📜 Missions</PauseBtn>
+                <PauseBtn onClick={() => setPausePanel('missions')}>Missions</PauseBtn>
                 {mode === 'multi' && (
                   <>
                     <PauseBtn
@@ -844,16 +739,16 @@ export function GameUI({
                       disabled={!!raidActive && raid?.phase !== 'won' && raid?.phase !== 'failed'}
                     >
                       {raid?.phase === 'active'
-                        ? `🌙 Raid wave ${raid.wave} · ${raid.kills}/${raid.goal} · ${raidRemain}s`
+                        ? `Raid wave ${raid.wave} · ${raid.kills}/${raid.goal} · ${raidRemain}s`
                         : raid?.phase === 'rest'
-                          ? `🌙 Next wave in ${raidRemain}s`
+                          ? `Next wave in ${raidRemain}s`
                           : raid?.phase === 'won'
-                            ? '🌙 Raid won'
+                            ? 'Raid won'
                             : raid?.phase === 'failed'
-                              ? '🌙 Raid failed — start again'
-                              : '🌙 Start Night Raid'}
+                              ? 'Raid failed — start again'
+                              : 'Start Night Raid'}
                     </PauseBtn>
-                    <PauseBtn onClick={onPing}>📍 Ping here</PauseBtn>
+                    <PauseBtn onClick={onPing}>Ping here</PauseBtn>
                     <div style={{ fontSize: 12, color: '#8affc1', marginTop: 4 }}>Players</div>
                     {nearbyPlayers.length === 0 ? (
                       <div style={{ fontSize: 11, color: '#8a94a5' }}>
@@ -874,14 +769,14 @@ export function GameUI({
                   Camera · {cameraMode === 'first' ? '1st person' : '3rd person'}
                 </PauseBtn>
                 <PauseBtn onClick={onToggleNight} disabled={nightLocked}>
-                  {night ? '🌙 Night' : '☀️ Day'}
+                  {night ? 'Night' : 'Day'}
                   {nightLocked ? ' · locked' : ''}
                 </PauseBtn>
                 <PauseBtn onClick={onToggleTouchMode}>
                   Controls · {touchMode ? 'Touch' : 'Mouse'}
                 </PauseBtn>
-                <PauseBtn onClick={() => setPausePanel('help')}>? Help</PauseBtn>
-                {onMenu && <PauseBtn onClick={onMenu}>🏠 Back to menu</PauseBtn>}
+                <PauseBtn onClick={() => setPausePanel('help')}>Help</PauseBtn>
+                {onMenu && <PauseBtn onClick={onMenu}>Back to menu</PauseBtn>}
               </>
             )}
             {pausePanel === 'missions' && (
@@ -933,8 +828,8 @@ export function GameUI({
             <div style={{ fontSize: 16, color: '#fff' }}>{touchMode ? 'Tap to play' : 'Click to play'}</div>
             <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
               {touchMode
-                ? 'Joystick to move • Drag to look • ☰ for missions & settings'
-                : 'WASD to move • Space to jump • Click to build • ☰ for settings'}
+                ? 'Joystick to move • Drag to look • Pause for missions & settings'
+                : 'WASD to move • Space to jump • Click to build • Esc for settings'}
             </div>
             {onMenu && (
               <button
@@ -1081,7 +976,9 @@ function MissionBoard({
               {m.status === 'done' ? '✓ ' : m.status === 'locked' ? '🔒 ' : ''}
               {m.title}
             </div>
-            <div style={{ color: '#ffd76a', fontSize: 11 }}>⭐ {m.reward}</div>
+            <div style={{ color: '#ffd76a', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <HudIcon name="star" size={12} color="#ffd76a" /> {m.reward}
+            </div>
           </div>
           <div style={{ fontSize: 11, color: '#b8c4d0', marginTop: 4, lineHeight: 1.4 }}>{m.blurb}</div>
           {(m.status === 'available' || m.status === 'active') && (
@@ -1119,12 +1016,12 @@ function HelpList({ touchMode }: { touchMode: boolean }) {
       <div style={line}>
         <div>Joystick — Move</div>
         <div>Drag empty screen — Look</div>
-        <div>JUMP / ATK / PLACE — actions</div>
-        <div>⚔️ / 🧱 — Fight or Build</div>
-        <div>Tap chip — switch block / weapon</div>
-        <div>DRIVE / RIDE / FIX — when nearby</div>
-        <div>☰ — Missions, camera, day/night</div>
-        <div style={{ color: '#8affc1' }}>Kill zombies — earn ⭐ points</div>
+        <div>Jump / Attack / Place — actions</div>
+        <div>Sword or cube on the right — Fight or Build</div>
+        <div>Tap the item — switch block / weapon</div>
+        <div>Car / mount / wrench — when nearby</div>
+        <div>Pause — missions, camera, day/night</div>
+        <div style={{ color: '#8affc1' }}>Kill zombies — earn points</div>
       </div>
     );
   }
@@ -1135,8 +1032,8 @@ function HelpList({ touchMode }: { touchMode: boolean }) {
       <div>Mouse — Look · Left click break/attack</div>
       <div>Right click — Place · 1–9 blocks · Q weapon</div>
       <div>B — Shop · E car/animal · R repair</div>
-      <div>Esc / ☰ — Pause (camera, day/night, missions)</div>
-      <div style={{ color: '#8affc1' }}>Kill zombies — earn ⭐ points</div>
+      <div>Esc — Pause (camera, day/night, missions)</div>
+      <div style={{ color: '#8affc1' }}>Kill zombies — earn points</div>
       <div style={{ color: '#ffe9a8' }}>Lamplight repels zombies at night</div>
     </div>
   );
