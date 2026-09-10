@@ -211,7 +211,7 @@ export default function Game({
   const [webglError, setWebglError] = useState(false);
   const [touchMode, setTouchMode] = useState(() => isTouchDevice());
   const [started, setStarted] = useState(false);
-  const [cameraMode, setCameraMode] = useState<CameraMode>('first');
+  const [cameraMode, setCameraMode] = useState<CameraMode>(() => (isTouchDevice() ? 'third' : 'first'));
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const [health, setHealth] = useState(10);
   const [respawnSignal, setRespawnSignal] = useState(0);

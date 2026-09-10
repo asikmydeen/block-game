@@ -351,6 +351,9 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
           onPress={() => {
             touchState.break = true;
           }}
+          onRelease={() => {
+            touchState.break = false;
+          }}
         />
       )}
       {!driving && stance === 'build' && (

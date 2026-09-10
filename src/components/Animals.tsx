@@ -282,7 +282,7 @@ export function Animals({ world, playerPosRef, touchMode, onNearAnimal }: Animal
           // The right arm swings when the player attacks from the saddle.
           riderCombat.swingTimer = Math.max(0, riderCombat.swingTimer - dt);
           const punch = riderCombat.swingTimer > 0
-            ? Math.sin(((0.25 - riderCombat.swingTimer) / 0.25) * Math.PI)
+            ? Math.sin(((0.32 - riderCombat.swingTimer) / 0.32) * Math.PI)
             : 0;
           if (limbs.leftLeg) {
             limbs.leftLeg.rotation.x = -0.7;

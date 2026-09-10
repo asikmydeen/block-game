@@ -114,26 +114,42 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night, wav
     };
 
     combatRegistry.hitZombies = (origin, dir, maxDist, damage) => {
-      let best: { z: ZombieData; t: number } | null = null;
+      const look = dir.clone();
+      if (look.lengthSq() < 1e-6) return null;
+      look.normalize();
+      const melee = maxDist <= 6;
+      const fatRadius = melee ? 1.85 : 1.35;
+      const minCos = melee ? 0.12 : 0.55; // melee ~83° cone, guns ~57°
+      let best: { z: ZombieData; dist: number } | null = null;
+
       for (const z of zombies) {
         if (z.dead) continue;
         const center = new THREE.Vector3(z.pos.x, z.pos.y + 1.0, z.pos.z);
         const toC = center.clone().sub(origin);
-        const t = toC.dot(dir);
-        if (t < 0 || t > maxDist) continue;
-        const closest = origin.clone().addScaledVector(dir, t);
-        if (closest.distanceToSquared(center) < 0.85 * 0.85) {
-          if (!best || t < best.t) best = { z, t };
-        }
+        const dist = toC.length();
+        if (dist > maxDist + 0.7) continue;
+        const forward = toC.dot(look);
+        if (forward < -0.35) continue; // behind the player
+        const closest = origin.clone().addScaledVector(look, THREE.MathUtils.clamp(forward, 0, maxDist));
+        const offRay = closest.distanceTo(center);
+        const cos = dist > 0.001 ? forward / dist : 1;
+        const veryClose = melee && dist <= Math.min(2.7, maxDist + 0.4);
+        if (offRay > fatRadius && cos < minCos && !veryClose) continue;
+
+        const toward = dist > 0.001 ? toC.clone().multiplyScalar(1 / dist) : look;
+        if (!veryClose && firstBlockT(origin, toward, dist) < dist - 0.45) continue;
+
+        if (!best || dist < best.dist) best = { z, dist };
       }
       if (!best) return null;
-      // Occlusion: a solid block between the player and the zombie stops the attack
-      if (firstBlockT(origin, dir, best.t) < best.t) return null;
       const z = best.z;
       z.health -= damage;
-      z.hitTimer = 0.2;
-      const kx = z.pos.x + dir.x * 0.6;
-      const kz = z.pos.z + dir.z * 0.6;
+      z.hitTimer = 0.28;
+      const knock = look.clone();
+      knock.y = 0;
+      if (knock.lengthSq() > 0.01) knock.normalize();
+      const kx = z.pos.x + knock.x * 0.7;
+      const kz = z.pos.z + knock.z * 0.7;
       if (!isSolid(world, kx, z.pos.y, kz) && !isSolid(world, kx, z.pos.y + 1, kz)) {
         z.pos.x = kx;
         z.pos.z = kz;

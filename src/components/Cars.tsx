@@ -239,7 +239,7 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
         const tProj = toCar.dot(dir);
         if (tProj < 0 || tProj > maxDist) continue;
         const distSq = toCar.lengthSq() - tProj * tProj;
-        const radius = 1.9;
+        const radius = 2.4;
         if (distSq > radius * radius) continue;
         const t = tProj - Math.sqrt(radius * radius - distSq);
         if (t < bestT) {

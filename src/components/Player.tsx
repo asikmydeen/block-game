@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS, INTERACTIVE_BLOCKS } from '../game/blockColors';
-import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
+import { touchState, consumeLookDelta, consumePlace } from './TouchControls';
 import { combatRegistry, getWeapon, type WeaponType } from '../game/combat';
 import { drivingState, carsRegistry } from '../game/cars';
 import { ridingState, riderCombat } from '../game/animals';
@@ -31,6 +31,7 @@ const REACH = 5;
 export type CameraMode = 'first' | 'third';
 
 const THIRD_PERSON_DIST = 4.5;
+const SWING_DUR = 0.32;
 
 interface PlayerProps {
   world: WorldState;
@@ -128,6 +129,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
   const bodyLimbsRef = useRef(createLimbs());
   const attackCooldownRef = useRef(0);
   const firingRef = useRef(false);
+  const prevBreakHeldRef = useRef(false);
 
   useEffect(() => {
     weaponRef.current = weapon;
@@ -165,8 +167,8 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     // Pace attacks by the weapon's rate (also drives the auto rifle)
     if (attackCooldownRef.current > 0) return true;
     attackCooldownRef.current = 1 / spec.attackRate;
-    swingTimerRef.current = 0.25;
-    if (ridingState.active) riderCombat.swingTimer = 0.25;
+    swingTimerRef.current = SWING_DUR;
+    if (ridingState.active) riderCombat.swingTimer = SWING_DUR;
     const eye = getEyePos();
     const muzzle = eye
       .clone()
@@ -314,10 +316,19 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       // Attacks aim along the chase camera's crosshair.
       attackCooldownRef.current = Math.max(0, attackCooldownRef.current - dt);
       if (ridingState.active) {
-        if (touchMode && consumeBreak()) {
+        if (touchMode) {
+          const breakHeld = touchState.break;
+          const breakPressed = breakHeld && !prevBreakHeldRef.current;
+          prevBreakHeldRef.current = breakHeld;
+          firingRef.current = breakHeld;
           const dir = new THREE.Vector3();
           camera.getWorldDirection(dir);
-          performAttack(dir);
+          const spec = getWeapon(weaponRef.current);
+          if (spec.auto && breakHeld) {
+            if (attackCooldownRef.current <= 0) performAttack(dir);
+          } else if (breakPressed) {
+            performAttack(dir);
+          }
         } else if (firingRef.current && isLockedRef.current) {
           const heldSpec = getWeapon(weaponRef.current);
           if (heldSpec.auto && attackCooldownRef.current <= 0) {
@@ -415,13 +426,22 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     }
 
     if (touchMode) {
-      if (consumeBreak()) {
+      const breakHeld = touchState.break;
+      const breakPressed = breakHeld && !prevBreakHeldRef.current;
+      prevBreakHeldRef.current = breakHeld;
+      firingRef.current = breakHeld;
+      if (breakHeld) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
-        if (!performAttack(dir)) {
-          const result = raycastBlocks(getEyePos(), dir, world.getBlock, REACH * powerState.reachMult);
-          if (result.hit && result.blockPos) {
-            onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
+        const spec = getWeapon(weaponRef.current);
+        if (spec.auto) {
+          if (attackCooldownRef.current <= 0) performAttack(dir);
+        } else if (breakPressed) {
+          if (!performAttack(dir)) {
+            const result = raycastBlocks(getEyePos(), dir, world.getBlock, REACH * powerState.reachMult);
+            if (result.hit && result.blockPos) {
+              onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
+            }
           }
         }
       }
@@ -526,11 +546,43 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
         // Walk swing driven by horizontal speed
         const limbs = bodyLimbsRef.current;
         const moving = Math.hypot(velocityRef.current.x, velocityRef.current.z) > 0.5;
-        const swing = moving ? Math.sin(performance.now() * 0.009) * 0.65 : 0;
-        if (limbs.leftArm) limbs.leftArm.rotation.x = swing;
-        if (limbs.rightArm) limbs.rightArm.rotation.x = -swing;
-        if (limbs.leftLeg) limbs.leftLeg.rotation.x = -swing;
-        if (limbs.rightLeg) limbs.rightLeg.rotation.x = swing;
+        const walk = moving ? Math.sin(performance.now() * 0.009) * 0.65 : 0;
+        const attackT = swingTimerRef.current;
+        if (attackT > 0) {
+          const u = Math.min(1, (SWING_DUR - attackT) / SWING_DUR);
+          const punch = Math.sin(u * Math.PI);
+          const melee = !getWeapon(weaponRef.current).ranged;
+          if (melee) {
+            if (limbs.rightArm) {
+              limbs.rightArm.rotation.x = -0.25 - punch * 1.7;
+              limbs.rightArm.rotation.z = punch * 0.55;
+            }
+            if (limbs.leftArm) {
+              limbs.leftArm.rotation.x = walk * 0.25 + punch * 0.35;
+              limbs.leftArm.rotation.z = 0;
+            }
+          } else {
+            if (limbs.rightArm) {
+              limbs.rightArm.rotation.x = -1.15 - punch * 0.4;
+              limbs.rightArm.rotation.z = 0.2;
+            }
+            if (limbs.leftArm) {
+              limbs.leftArm.rotation.x = -0.95;
+              limbs.leftArm.rotation.z = -0.25;
+            }
+          }
+        } else {
+          if (limbs.leftArm) {
+            limbs.leftArm.rotation.x = walk;
+            limbs.leftArm.rotation.z = 0;
+          }
+          if (limbs.rightArm) {
+            limbs.rightArm.rotation.x = -walk;
+            limbs.rightArm.rotation.z = 0;
+          }
+        }
+        if (limbs.leftLeg) limbs.leftLeg.rotation.x = -walk;
+        if (limbs.rightLeg) limbs.rightLeg.rotation.x = walk;
       }
     }
 
@@ -562,11 +614,26 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     swingTimerRef.current = Math.max(0, swingTimerRef.current - dt);
     if (weaponInnerRef.current) {
       const st = swingTimerRef.current;
-      const swing = st > 0 ? Math.sin(((0.25 - st) / 0.25) * Math.PI) : 0;
-      weaponInnerRef.current.rotation.x = -swing * 0.9;
       const bobT = performance.now() * 0.006;
       const moving = Math.abs(velocityRef.current.x) + Math.abs(velocityRef.current.z) > 0.5;
-      weaponInnerRef.current.position.y = -0.3 + (moving ? Math.sin(bobT) * 0.015 : 0);
+      const bob = moving ? Math.sin(bobT) * 0.015 : 0;
+      if (st > 0) {
+        const punch = Math.sin(Math.min(1, (SWING_DUR - st) / SWING_DUR) * Math.PI);
+        const melee = !getWeapon(weaponRef.current).ranged;
+        if (melee) {
+          weaponInnerRef.current.rotation.x = -punch * 1.4;
+          weaponInnerRef.current.rotation.z = -punch * 0.75;
+          weaponInnerRef.current.position.set(0.35, -0.3 + bob + punch * 0.1, -0.6 - punch * 0.42);
+        } else {
+          weaponInnerRef.current.rotation.x = -punch * 0.28;
+          weaponInnerRef.current.rotation.z = 0;
+          weaponInnerRef.current.position.set(0.35, -0.3 + bob, -0.6 + punch * 0.14);
+        }
+      } else {
+        weaponInnerRef.current.rotation.x = 0;
+        weaponInnerRef.current.rotation.z = 0;
+        weaponInnerRef.current.position.set(0.35, -0.3 + bob, -0.6);
+      }
     }
 
     // Tracer fade
@@ -597,6 +664,25 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       {/* First-person weapon viewmodel */}
       <group ref={weaponGroupRef}>
         <group ref={weaponInnerRef} position={[0.35, -0.3, -0.6]}>
+          {/* Fists — default weapon has no other viewmodel */}
+          <group visible={weapon === 'hand'} rotation={[0.25, 0.15, 0.2]}>
+            <mesh position={[0.02, -0.04, -0.12]}>
+              <boxGeometry args={[0.16, 0.42, 0.16]} />
+              <meshBasicMaterial color="#ffd9b3" />
+            </mesh>
+            <mesh position={[0.02, 0.02, -0.32]}>
+              <boxGeometry args={[0.2, 0.18, 0.18]} />
+              <meshBasicMaterial color="#e8c4a0" />
+            </mesh>
+            <mesh position={[-0.28, -0.12, -0.02]} rotation={[0.4, 0, 0.35]}>
+              <boxGeometry args={[0.14, 0.34, 0.14]} />
+              <meshBasicMaterial color="#ffd9b3" />
+            </mesh>
+            <mesh position={[-0.3, 0.02, -0.16]}>
+              <boxGeometry args={[0.16, 0.16, 0.16]} />
+              <meshBasicMaterial color="#e8c4a0" />
+            </mesh>
+          </group>
           {/* Battle Axe */}
           <group visible={weapon === 'axe'} rotation={[0.35, 0, -0.3]}>
             <mesh position={[0, 0.1, 0]}>
