@@ -28,20 +28,20 @@ import { powerState } from '../game/powers';
 import { RemotePlayers } from '../components/RemotePlayers';
 import {
   MISSIONS,
-  RAID_BONUS,
+  formatClock,
   getMission,
+  isMissionId,
   isUnlocked,
   loadLocalMissions,
   mergeMissions,
-  nextMission,
-  raidZombieWave,
   saveLocalMissions,
   type MissionId,
   type ZombieWave,
 } from '../game/missions';
-import { mpBridge, RAID_IDLE, type MpPlayerInfo, type PingEvent, type RaidState } from '../game/mpBridge';
+import { mpBridge, RACE_IDLE, type MpPlayerInfo, type PingEvent, type RaceState } from '../game/mpBridge';
+import { LevelSelect, type LevelBox } from '../components/LevelSelect';
 
-export type GameMode = 'free' | 'multi';
+export type GameMode = 'free' | 'levels' | 'multi';
 
 enum Controls {
   forward = 'forward',
@@ -231,15 +231,12 @@ export default function Game({
   );
   const [activeMission, setActiveMission] = useState<MissionId | null>(null);
   const [missionCount, setMissionCount] = useState(0);
-  const [missionStartedAt, setMissionStartedAt] = useState(0);
-  const [campaignDismissed, setCampaignDismissed] = useState(
-    () => mergeMissions(account.missionsCompleted, loadLocalMissions(account.id)).size > 0
-  );
-  const [raid, setRaid] = useState<RaidState>(RAID_IDLE);
+  const [levelEndsAt, setLevelEndsAt] = useState(0);
+  const [showLevelSelect, setShowLevelSelect] = useState(() => mode !== 'free');
+  const [race, setRace] = useState<RaceState>(RACE_IDLE);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [pingMark, setPingMark] = useState<{ x: number; y: number; z: number; from: string; until: number } | null>(null);
   const [mpPlayers, setMpPlayers] = useState<MpPlayerInfo[]>([]);
-  const awardedRaidWaveRef = useRef(0);
   // Score and unlocked weapons are restored from the signed-in account.
   const [score, setScore] = useState(() => account.score ?? 0);
   const [ownedWeapons, setOwnedWeapons] = useState<ReadonlySet<WeaponType>>(
@@ -293,10 +290,12 @@ export default function Game({
   // monotonic maxima, so a dropped save is recovered by the next one.
   const progressRef = useRef({ score, zombieKills, deathCount, ownedWeapons, completedMissions });
   progressRef.current = { score, zombieKills, deathCount, ownedWeapons, completedMissions };
-  const raidRef = useRef(raid);
-  raidRef.current = raid;
+  const raceRef = useRef(race);
+  raceRef.current = race;
   const activeMissionRef = useRef(activeMission);
   activeMissionRef.current = activeMission;
+  const levelEndsAtRef = useRef(levelEndsAt);
+  levelEndsAtRef.current = levelEndsAt;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   const touchModeRef = useRef(touchMode);
@@ -352,7 +351,7 @@ export default function Game({
     };
   }, []);
 
-  // Zombie kills award shop points and feed missions / raids.
+  // Zombie kills award shop points and feed kill-count levels.
   useEffect(() => {
     combatRegistry.onZombieKilled = () => {
       if (!aliveRef.current) return;
@@ -362,7 +361,7 @@ export default function Game({
       if (mid && getMission(mid).kind === 'kills') {
         setMissionCount(c => c + 1);
       }
-      if (raidRef.current.phase === 'active') mpBridge.raidKill();
+      // timed kill-levels increment above; MP race completion is sent when the count hits the goal
     };
     return () => {
       combatRegistry.onZombieKilled = null;
@@ -395,12 +394,12 @@ export default function Game({
       const mid = activeMissionRef.current;
       if (mid) {
         const def = getMission(mid);
-        if (def.kind === 'survive') {
-          setActiveMission(null);
-          setMissionCount(0);
-          if (def.night) setNight(false);
-          showToastRef.current?.(`${def.title} failed. Retry from Missions.`);
-        }
+        activeMissionRef.current = null;
+        setActiveMission(null);
+        setMissionCount(0);
+        if (def.night) setNight(false);
+        setShowLevelSelect(true);
+        showToastRef.current?.(`Level ${def.n} failed. You died.`);
       }
     }
   }, []);
@@ -432,26 +431,46 @@ export default function Game({
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   }, []);
 
-  const startMission = useCallback((id: MissionId) => {
+  const failLevel = useCallback((reason: string) => {
+    const id = activeMissionRef.current;
+    if (!id) return;
+    const def = getMission(id);
+    activeMissionRef.current = null;
+    setActiveMission(null);
+    setMissionCount(0);
+    setLevelEndsAt(0);
+    if (def.night) setNight(false);
+    setShowLevelSelect(true);
+    showToast(reason);
+  }, [showToast]);
+
+  const startLevel = useCallback((id: MissionId, opts?: { endsAt?: number; fromServer?: boolean }) => {
+    if (mode === 'multi' && !opts?.fromServer) {
+      mpBridge.levelStart(id);
+      return;
+    }
+    if (mode === 'levels' && !isUnlocked(id, completedMissions) && !opts?.fromServer) return;
     const def = getMission(id);
     activeMissionRef.current = id;
     setActiveMission(id);
     setMissionCount(0);
-    setMissionStartedAt(Date.now());
+    const ends = opts?.endsAt ?? Date.now() + def.timeLimit * 1000;
+    setLevelEndsAt(ends);
+    levelEndsAtRef.current = ends;
+    setShowLevelSelect(false);
     setPaused(false);
-    setCampaignDismissed(true);
-    if (def.night) setNight(true);
+    setNight(!!def.night);
+    playerPosRef.current.set(8, 18, 8);
+    setRespawnSignal((s) => s + 1);
+    healthRef.current = powerState.maxHealth;
+    setHealth(powerState.maxHealth);
     if (!touchModeRef.current) canvasElRef.current?.requestPointerLock();
-    showToast(`${def.title} — ${def.blurb}`);
-  }, [showToast]);
+    showToast(`Level ${def.n} · ${def.title} · ${formatClock(def.timeLimit)}`);
+  }, [mode, completedMissions, showToast]);
 
   const abandonMission = useCallback(() => {
-    const id = activeMissionRef.current;
-    if (id && getMission(id).night) setNight(false);
-    setActiveMission(null);
-    setMissionCount(0);
-    showToast('Mission abandoned.');
-  }, [showToast]);
+    failLevel('Level abandoned.');
+  }, [failLevel]);
 
   const completeMission = useCallback((id: MissionId) => {
     if (activeMissionRef.current !== id) return;
@@ -466,19 +485,12 @@ export default function Game({
     setScore(s => s + def.reward);
     setActiveMission(null);
     setMissionCount(0);
+    setLevelEndsAt(0);
     if (def.night) setNight(false);
-    showToast(`${def.title} complete! +${def.reward} ⭐`);
-    const done = mergeMissions(completedMissions, [id]);
-    const nxt = nextMission(done);
-    if (nxt) {
-      window.setTimeout(() => {
-        if (activeMissionRef.current) return;
-        startMission(nxt);
-      }, 2500);
-    } else {
-      window.setTimeout(() => showToast('Campaign complete. You held the city.'), 2600);
-    }
-  }, [account.id, completedMissions, showToast, startMission]);
+    setShowLevelSelect(true);
+    if (mode === 'multi') mpBridge.levelComplete(id);
+    showToast(`Level ${def.n} clear! +${def.reward} pts`);
+  }, [account.id, mode, showToast]);
 
   const handleInteract = useCallback((wx: number, wy: number, wz: number) => {
     const bt = world.getBlock(wx, wy, wz);
@@ -574,7 +586,7 @@ export default function Game({
       if (e.key === 'n' || e.key === 'N') {
         if (e.repeat) return;
         const mid = activeMissionRef.current;
-        if ((mid && getMission(mid).night) || raidRef.current.phase === 'active') return;
+        if (mid && getMission(mid).night) return;
         setNight(n => !n);
       }
       if (e.key === 'e' || e.key === 'E') {
@@ -691,6 +703,12 @@ export default function Game({
     const id = activeMission;
     if (!id) return;
     const def = getMission(id);
+    const remain = (levelEndsAt - nowMs) / 1000;
+    if (remain <= 0) {
+      if (def.kind === 'survive' && aliveRef.current) completeMission(id);
+      else failLevel('Time is up.');
+      return;
+    }
     const pos = playerPosRef.current;
     if (def.kind === 'goto' && def.target) {
       const dist = Math.hypot(pos.x - def.target.x, pos.z - def.target.z);
@@ -703,38 +721,26 @@ export default function Game({
     }
     if (def.kind === 'kills' && missionCount >= (def.count ?? 1)) completeMission(id);
     if (def.kind === 'chests' && missionCount >= (def.count ?? 1)) completeMission(id);
-    if (def.kind === 'survive' && missionStartedAt > 0) {
-      const elapsed = (nowMs - missionStartedAt) / 1000;
-      if (elapsed >= (def.duration ?? 0)) completeMission(id);
-    }
-  }, [nowMs, activeMission, missionCount, missionStartedAt, completeMission]);
+  }, [nowMs, activeMission, missionCount, levelEndsAt, completeMission, failLevel]);
 
-  const lastRaidNote = useRef('');
+  const lastRaceKey = useRef('');
   useEffect(() => {
-    const key = `${raid.phase}-${raid.wave}`;
-    if (raid.phase === 'active') setNight(true);
-    else if (raid.phase === 'rest' || raid.phase === 'won') {
-      if (!(activeMissionRef.current && getMission(activeMissionRef.current).night)) {
-        setNight(false);
+    if (mode !== 'multi') return;
+    const key = `${race.phase}:${race.levelId}:${race.endsAt}:${race.winner ?? ''}`;
+    if (lastRaceKey.current === key) return;
+    lastRaceKey.current = key;
+    if (race.phase === 'active' && isMissionId(race.levelId ?? '')) {
+      if (activeMissionRef.current !== race.levelId) {
+        startLevel(race.levelId as MissionId, { endsAt: race.endsAt, fromServer: true });
       }
-    }
-    if (lastRaidNote.current === key) return;
-    lastRaidNote.current = key;
-    if ((raid.phase === 'rest' || raid.phase === 'won') && raid.wave > 0) {
-      if (awardedRaidWaveRef.current !== raid.wave) {
-        awardedRaidWaveRef.current = raid.wave;
-        const bonus = RAID_BONUS[raid.wave] ?? 40;
-        setScore(s => s + bonus);
-        showToast(
-          raid.phase === 'won'
-            ? `Night Raid won! +${bonus} ⭐`
-            : `Wave ${raid.wave} cleared! +${bonus} ⭐`
-        );
+    } else if (race.phase === 'won' && race.winner) {
+      if (race.winner !== account.username && activeMissionRef.current) {
+        failLevel(`${race.winner} finished first.`);
       }
+    } else if (race.phase === 'failed' && activeMissionRef.current) {
+      failLevel('Time is up.');
     }
-    if (raid.phase === 'idle') awardedRaidWaveRef.current = 0;
-    if (raid.phase === 'failed') showToast('The horde overran the city.');
-  }, [raid.phase, raid.wave, showToast]);
+  }, [mode, race, account.username, startLevel, failLevel, showToast]);
 
   useEffect(() => {
     if (pingMark && pingMark.until <= nowMs) setPingMark(null);
@@ -784,14 +790,12 @@ export default function Game({
     }
   }, [touchMode]);
 
-  const nightLocked =
-    !!(activeMission && getMission(activeMission).night) || raid.phase === 'active';
+  const nightLocked = !!(activeMission && getMission(activeMission).night);
 
-  const zombieWave = useMemo(() => {
-    if (raid.phase === 'active') return raidZombieWave(raid.wave);
+  const zombieWave = useMemo((): ZombieWave | null => {
     if (activeMission) return getMission(activeMission).wave ?? null;
     return null;
-  }, [raid.phase, raid.wave, activeMission]);
+  }, [activeMission]);
 
   const waypoints = useMemo(() => {
     const list: Array<{ x: number; y: number; z: number; label: string; color?: string }> = [];
@@ -806,48 +810,44 @@ export default function Game({
   }, [pingMark, nowMs, activeMission]);
 
   const objective = useMemo(() => {
-    if (raid.phase === 'active') {
-      const remain = Math.max(0, Math.ceil((raid.endsAt - nowMs) / 1000));
-      return {
-        title: `Night Raid · wave ${raid.wave}`,
-        detail: `${raid.kills}/${raid.goal} kills · ${remain}s`,
-      };
-    }
-    if (raid.phase === 'rest') {
-      const remain = Math.max(0, Math.ceil((raid.endsAt - nowMs) / 1000));
-      return { title: 'Night Raid', detail: `Rest · next wave in ${remain}s` };
-    }
     if (!activeMission) return null;
     const def = getMission(activeMission);
+    const remain = formatClock((levelEndsAt - nowMs) / 1000);
     let detail = def.blurb;
     if (def.kind === 'kills') detail = `${missionCount}/${def.count ?? 0} kills`;
-    if (def.kind === 'chests') detail = 'Loot a chest';
-    if (def.kind === 'survive' && missionStartedAt) {
-      const remain = Math.max(0, Math.ceil(def.duration! - (nowMs - missionStartedAt) / 1000));
-      detail = `Survive ${remain}s`;
-    }
+    if (def.kind === 'chests') detail = `${missionCount}/${def.count ?? 1} chests`;
+    if (def.kind === 'survive') detail = 'Stay alive';
     if (def.kind === 'goto' && def.target) detail = `Go to ${def.target.label}`;
     if (def.kind === 'drive' && def.target) detail = `Drive to ${def.target.label}`;
-    return { title: def.title, detail };
-  }, [raid, nowMs, activeMission, missionCount, missionStartedAt]);
+    const raceNote =
+      mode === 'multi' && race.winner
+        ? ` · ${race.winner} wins`
+        : mode === 'multi'
+          ? ' · race'
+          : '';
+    return {
+      title: `Lv ${def.n} · ${def.title} · ${remain}`,
+      detail: `${detail}${raceNote}`,
+    };
+  }, [nowMs, activeMission, missionCount, levelEndsAt, mode, race.winner]);
 
-  const missionItems = useMemo(
+  const levelItems: LevelBox[] = useMemo(
     () =>
       MISSIONS.map((m) => ({
         id: m.id,
+        n: m.n,
         title: m.title,
         blurb: m.blurb,
-        hint: m.hint,
-        reward: m.reward,
+        timeLimit: m.timeLimit,
         status: (completedMissions.has(m.id)
           ? 'done'
           : activeMission === m.id
             ? 'active'
-            : isUnlocked(m.id, completedMissions)
-              ? 'available'
-              : 'locked') as 'locked' | 'available' | 'active' | 'done',
+            : mode === 'multi' || isUnlocked(m.id, completedMissions)
+              ? 'open'
+              : 'locked') as LevelBox['status'],
       })),
-    [completedMissions, activeMission]
+    [completedMissions, activeMission, mode]
   );
 
   const nearbyPlayers = useMemo(() => {
@@ -863,16 +863,12 @@ export default function Game({
     mpBridge.ping(p.x, p.y, p.z);
   }, []);
 
-  const handleRaidStart = useCallback(() => {
-    mpBridge.raidStart();
-    setPaused(false);
-    if (!touchModeRef.current) canvasElRef.current?.requestPointerLock();
-  }, []);
-
-  const handleAcceptCampaign = useCallback(() => {
-    const nxt = nextMission(completedMissions) ?? 'park';
-    startMission(nxt);
-  }, [completedMissions, startMission]);
+  const handlePickLevel = useCallback(
+    (id: MissionId) => {
+      startLevel(id);
+    },
+    [startLevel]
+  );
 
   if (webglError) {
     return (
@@ -937,7 +933,7 @@ export default function Game({
               <RemotePlayers
                 playerPosRef={playerPosRef}
                 onStatusChange={(status, count) => setMpStatus({ status, count })}
-                onRaid={setRaid}
+                onRace={setRace}
                 onPlayers={setMpPlayers}
                 onPing={(ev: PingEvent) => {
                   setPingMark({ ...ev, until: Date.now() + 8000 });
@@ -985,21 +981,27 @@ export default function Game({
         onPlayStance={setPlayStance}
         nightLocked={nightLocked}
         objective={objective}
-        missions={missionItems}
-        onStartMission={startMission}
         onAbandonMission={abandonMission}
-        showCampaignPrompt={started && !campaignDismissed && !paused && !showDeath}
-        onAcceptCampaign={handleAcceptCampaign}
-        onDismissCampaign={() => setCampaignDismissed(true)}
+        onOpenLevels={mode === 'free' ? undefined : () => setShowLevelSelect(true)}
         mode={mode}
-        raid={mode === 'multi' ? raid : null}
-        nowMs={nowMs}
-        onStartRaid={handleRaidStart}
         onPing={handlePing}
         nearbyPlayers={nearbyPlayers}
         mpStatus={mode === 'multi' ? mpStatus : undefined}
         dead={showDeath}
       />
+
+      {started && !showDeath && !paused && showLevelSelect && mode !== 'free' && (
+        <LevelSelect
+          items={levelItems}
+          subtitle={
+            mode === 'multi'
+              ? 'Pick a box. Everyone races the same clock — first to finish wins.'
+              : 'Pick a numbered box. Finish the objective before time runs out.'
+          }
+          onPick={handlePickLevel}
+          onClose={activeMission ? () => setShowLevelSelect(false) : onMenu}
+        />
+      )}
 
       {isFlashing && (
         <div
@@ -1014,7 +1016,7 @@ export default function Game({
       )}
 
       <TouchControls
-        enabled={touchMode && started && !showDeath && !paused && !shopOpen}
+        enabled={touchMode && started && !showDeath && !paused && !shopOpen && !showLevelSelect}
         stance={playStance}
         driving={!!carInfo}
       />

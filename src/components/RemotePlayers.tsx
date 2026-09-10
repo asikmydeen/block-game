@@ -4,7 +4,7 @@ import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { Humanoid, createLimbs, type HumanoidLimbs } from './Humanoid';
 import { getToken } from '../game/account';
-import { mpBridge, RAID_IDLE, type MpPlayerInfo, type PingEvent, type RaidState } from '../game/mpBridge';
+import { mpBridge, RACE_IDLE, type MpPlayerInfo, type PingEvent, type RaceState } from '../game/mpBridge';
 
 interface RemotePlayer {
   id: string;
@@ -19,12 +19,12 @@ interface RemotePlayer {
 interface RemotePlayersProps {
   playerPosRef: MutableRefObject<THREE.Vector3>;
   onStatusChange: (status: 'connecting' | 'online' | 'offline', count: number) => void;
-  onRaid?: (raid: RaidState) => void;
+  onRace?: (race: RaceState) => void;
   onPing?: (ping: PingEvent) => void;
   onPlayers?: (players: MpPlayerInfo[]) => void;
 }
 
-export function RemotePlayers({ playerPosRef, onStatusChange, onRaid, onPing, onPlayers }: RemotePlayersProps) {
+export function RemotePlayers({ playerPosRef, onStatusChange, onRace, onPing, onPlayers }: RemotePlayersProps) {
   const { camera } = useThree();
   const [players, setPlayers] = useState<RemotePlayer[]>([]);
   const myIdRef = useRef<string | null>(null);
@@ -32,10 +32,10 @@ export function RemotePlayers({ playerPosRef, onStatusChange, onRaid, onPing, on
   const groupRefs = useRef<Map<string, THREE.Group>>(new Map());
   const targetsRef = useRef<Map<string, RemotePlayer>>(new Map());
   const limbRefs = useRef<Map<string, HumanoidLimbs>>(new Map());
-  const onRaidRef = useRef(onRaid);
+  const onRaceRef = useRef(onRace);
   const onPingRef = useRef(onPing);
   const onPlayersRef = useRef(onPlayers);
-  onRaidRef.current = onRaid;
+  onRaceRef.current = onRace;
   onPingRef.current = onPing;
   onPlayersRef.current = onPlayers;
 
@@ -102,13 +102,12 @@ export function RemotePlayers({ playerPosRef, onStatusChange, onRaid, onPing, on
             onPlayersRef.current?.(
               others.map((p) => ({ id: p.id, name: p.name, x: p.x, y: p.y, z: p.z }))
             );
-          } else if (msg.type === 'raid') {
-            onRaidRef.current?.({
+          } else if (msg.type === 'race') {
+            onRaceRef.current?.({
               phase: msg.phase ?? 'idle',
-              wave: Number(msg.wave) || 0,
-              kills: Number(msg.kills) || 0,
-              goal: Number(msg.goal) || 0,
+              levelId: typeof msg.levelId === 'string' ? msg.levelId : null,
               endsAt: Number(msg.endsAt) || 0,
+              winner: typeof msg.winner === 'string' ? msg.winner : null,
             });
           } else if (msg.type === 'ping') {
             onPingRef.current?.({
@@ -141,7 +140,7 @@ export function RemotePlayers({ playerPosRef, onStatusChange, onRaid, onPing, on
     return () => {
       closed = true;
       mpBridge.send = null;
-      onRaidRef.current?.(RAID_IDLE);
+      onRaceRef.current?.(RACE_IDLE);
       onPlayersRef.current?.([]);
       if (sendTimer) clearInterval(sendTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);

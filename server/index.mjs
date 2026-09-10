@@ -104,16 +104,9 @@ app.post('/api/profile/progress', wrap(async (req, res) => {
   }
 
   if (Array.isArray(b.missionsCompleted)) {
-    const allowed = new Set([
-      'park',
-      'firstblood',
-      'scavenger',
-      'wheels',
-      'nightwatch',
-      'streets',
-      'rooftop',
-      'laststand',
-    ]);
+    const allowed = new Set(
+      Array.from({ length: 25 }, (_, i) => `l${String(i + 1).padStart(2, '0')}`)
+    );
     const incoming = b.missionsCompleted.filter((id) => allowed.has(id));
     const prev = ctx.player.missions_completed ?? [];
     patch.missions_completed = [...new Set([...prev, ...incoming])];

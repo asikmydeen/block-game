@@ -5,8 +5,6 @@ import { WEAPONS, type WeaponType } from '../game/combat';
 import { CAR_SPECS, type CarInfo, type CarKind } from '../game/cars';
 import { RIDE_SPECS, type RideableKind } from '../game/animals';
 import type { PlayStance } from './TouchControls';
-import type { MissionId } from '../game/missions';
-import type { RaidState } from '../game/mpBridge';
 import { BlockCube, HudIcon, HudRoundButton, WEAPON_GLYPH } from './HudIcons';
 import * as THREE from 'three';
 
@@ -27,15 +25,6 @@ const chromeBtn: CSSProperties = {
 export interface ObjectiveInfo {
   title: string;
   detail: string;
-}
-
-export interface MissionBoardItem {
-  id: MissionId;
-  title: string;
-  blurb: string;
-  hint: string;
-  reward: number;
-  status: 'locked' | 'available' | 'active' | 'done';
 }
 
 export interface NearbyPlayer {
@@ -79,16 +68,9 @@ interface GameUIProps {
   onPlayStance: (s: PlayStance) => void;
   nightLocked: boolean;
   objective: ObjectiveInfo | null;
-  missions: MissionBoardItem[];
-  onStartMission: (id: MissionId) => void;
   onAbandonMission: () => void;
-  showCampaignPrompt: boolean;
-  onAcceptCampaign: () => void;
-  onDismissCampaign: () => void;
-  mode: 'free' | 'multi';
-  raid: RaidState | null;
-  nowMs: number;
-  onStartRaid: () => void;
+  onOpenLevels?: () => void;
+  mode: 'free' | 'levels' | 'multi';
   onPing: () => void;
   nearbyPlayers: NearbyPlayer[];
   mpStatus?: { status: 'connecting' | 'online' | 'offline'; count: number };
@@ -184,22 +166,15 @@ export function GameUI({
   onPlayStance,
   nightLocked,
   objective,
-  missions,
-  onStartMission,
   onAbandonMission,
-  showCampaignPrompt,
-  onAcceptCampaign,
-  onDismissCampaign,
+  onOpenLevels,
   mode,
-  raid,
-  nowMs,
-  onStartRaid,
   onPing,
   nearbyPlayers,
   mpStatus,
   dead,
 }: GameUIProps) {
-  const [pausePanel, setPausePanel] = useState<'root' | 'missions' | 'help'>('root');
+  const [pausePanel, setPausePanel] = useState<'root' | 'help'>('root');
   const [sheet, setSheet] = useState<null | 'block' | 'weapon'>(null);
 
   const playing = started && !dead && (touchMode || isLocked || paused);
@@ -217,11 +192,6 @@ export function GameUI({
   } else if (nearCar?.broken) {
     context = { title: `Repair ${CAR_SPECS[nearCar.kind].name}`, glyph: 'wrench', color: 'rgba(160,120,30,0.9)', action: onRepairButton };
   }
-
-  const raidActive = raid && raid.phase !== 'idle';
-  const raidRemain = raid && (raid.phase === 'active' || raid.phase === 'rest')
-    ? Math.max(0, Math.ceil((raid.endsAt - nowMs) / 1000))
-    : 0;
 
   const openPause = () => {
     setPausePanel('root');
@@ -656,35 +626,6 @@ export function GameUI({
         </SheetScrim>
       )}
 
-      {playing && showCampaignPrompt && !paused && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '30%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 240,
-            background: 'rgba(10,14,20,0.92)',
-            border: '2px solid #7CFC00',
-            borderRadius: 12,
-            padding: '16px 18px',
-            color: 'white',
-            fontFamily: 'monospace',
-            width: 'min(340px, 90vw)',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: 16, fontWeight: 'bold', color: '#7CFC00', marginBottom: 8 }}>Start the campaign?</div>
-          <div style={{ fontSize: 12, color: '#c8d4e0', lineHeight: 1.5, marginBottom: 12 }}>
-            Eight missions in this city — park, zombies, a chest, a car, and a night stand.
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-            <button type="button" onClick={onAcceptCampaign} style={{ ...chromeBtn, background: '#2e8b57' }}>Start</button>
-            <button type="button" onClick={onDismissCampaign} style={chromeBtn}>Later</button>
-          </div>
-        </div>
-      )}
-
       {paused && (
         <div
           style={{
@@ -731,23 +672,19 @@ export function GameUI({
                   </div>
                 )}
                 <PauseBtn onClick={closePause} primary>Resume</PauseBtn>
-                <PauseBtn onClick={() => setPausePanel('missions')}>Missions</PauseBtn>
+                {onOpenLevels && (
+                  <PauseBtn
+                    onClick={() => {
+                      closePause();
+                      onOpenLevels();
+                    }}
+                  >
+                    Levels
+                  </PauseBtn>
+                )}
+                {objective && <PauseBtn onClick={onAbandonMission}>Forfeit level</PauseBtn>}
                 {mode === 'multi' && (
                   <>
-                    <PauseBtn
-                      onClick={onStartRaid}
-                      disabled={!!raidActive && raid?.phase !== 'won' && raid?.phase !== 'failed'}
-                    >
-                      {raid?.phase === 'active'
-                        ? `Raid wave ${raid.wave} · ${raid.kills}/${raid.goal} · ${raidRemain}s`
-                        : raid?.phase === 'rest'
-                          ? `Next wave in ${raidRemain}s`
-                          : raid?.phase === 'won'
-                            ? 'Raid won'
-                            : raid?.phase === 'failed'
-                              ? 'Raid failed — start again'
-                              : 'Start Night Raid'}
-                    </PauseBtn>
                     <PauseBtn onClick={onPing}>Ping here</PauseBtn>
                     <div style={{ fontSize: 12, color: '#8affc1', marginTop: 4 }}>Players</div>
                     {nearbyPlayers.length === 0 ? (
@@ -778,14 +715,6 @@ export function GameUI({
                 <PauseBtn onClick={() => setPausePanel('help')}>Help</PauseBtn>
                 {onMenu && <PauseBtn onClick={onMenu}>Back to menu</PauseBtn>}
               </>
-            )}
-            {pausePanel === 'missions' && (
-              <MissionBoard
-                items={missions}
-                onStart={onStartMission}
-                onAbandon={onAbandonMission}
-                onBack={() => setPausePanel('root')}
-              />
             )}
             {pausePanel === 'help' && (
               <>
@@ -942,73 +871,6 @@ function PauseBtn({
   );
 }
 
-function MissionBoard({
-  items,
-  onStart,
-  onAbandon,
-  onBack,
-}: {
-  items: MissionBoardItem[];
-  onStart: (id: MissionId) => void;
-  onAbandon: () => void;
-  onBack: () => void;
-}) {
-  const done = items.filter((i) => i.status === 'done').length;
-  return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 16, fontWeight: 'bold', color: '#ffd76a' }}>Missions</div>
-        <div style={{ fontSize: 12, color: '#8a94a5' }}>{done}/{items.length}</div>
-      </div>
-      {items.map((m) => (
-        <div
-          key={m.id}
-          style={{
-            background: m.status === 'active' ? 'rgba(124,252,0,0.1)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${m.status === 'active' ? '#7CFC00' : 'rgba(255,255,255,0.1)'}`,
-            borderRadius: 8,
-            padding: '8px 10px',
-            opacity: m.status === 'locked' ? 0.45 : 1,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ fontWeight: 'bold', fontSize: 13 }}>
-              {m.status === 'done' ? '✓ ' : m.status === 'locked' ? '🔒 ' : ''}
-              {m.title}
-            </div>
-            <div style={{ color: '#ffd76a', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <HudIcon name="star" size={12} color="#ffd76a" /> {m.reward}
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: '#b8c4d0', marginTop: 4, lineHeight: 1.4 }}>{m.blurb}</div>
-          {(m.status === 'available' || m.status === 'active') && (
-            <div style={{ fontSize: 11, color: '#8affc1', marginTop: 4 }}>{m.hint}</div>
-          )}
-          {m.status === 'available' && (
-            <button
-              type="button"
-              onClick={() => onStart(m.id)}
-              style={{ ...chromeBtn, marginTop: 8, background: '#2e8b57', padding: '6px 10px', fontSize: 12 }}
-            >
-              Start
-            </button>
-          )}
-          {m.status === 'active' && (
-            <button
-              type="button"
-              onClick={onAbandon}
-              style={{ ...chromeBtn, marginTop: 8, padding: '6px 10px', fontSize: 12 }}
-            >
-              Abandon
-            </button>
-          )}
-        </div>
-      ))}
-      <PauseBtn onClick={onBack}>← Back</PauseBtn>
-    </>
-  );
-}
-
 function HelpList({ touchMode }: { touchMode: boolean }) {
   const line: CSSProperties = { fontSize: 13, lineHeight: 1.8, color: '#d0d8e0' };
   if (touchMode) {
@@ -1020,7 +882,7 @@ function HelpList({ touchMode }: { touchMode: boolean }) {
         <div>Sword or cube on the right — Fight or Build</div>
         <div>Tap the item — switch block / weapon</div>
         <div>Car / mount / wrench — when nearby</div>
-        <div>Pause — missions, camera, day/night</div>
+        <div>Pause — levels, camera, day/night</div>
         <div style={{ color: '#8affc1' }}>Kill zombies — earn points</div>
       </div>
     );
@@ -1032,7 +894,7 @@ function HelpList({ touchMode }: { touchMode: boolean }) {
       <div>Mouse — Look · Left click break/attack</div>
       <div>Right click — Place · 1–9 blocks · Q weapon</div>
       <div>B — Shop · E car/animal · R repair</div>
-      <div>Esc — Pause (camera, day/night, missions)</div>
+      <div>Esc — Pause (camera, day/night, levels)</div>
       <div style={{ color: '#8affc1' }}>Kill zombies — earn points</div>
       <div style={{ color: '#ffe9a8' }}>Lamplight repels zombies at night</div>
     </div>

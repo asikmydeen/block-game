@@ -1,16 +1,14 @@
-// Campaign missions in the existing city. Sequential unlock; rewards are shop points.
+// Timed levels in the existing city. Free play is roam-only.
+// Solo: sequential unlock. Multiplayer: race the same clock.
 
 export type MissionId =
-  | 'park'
-  | 'firstblood'
-  | 'scavenger'
-  | 'wheels'
-  | 'nightwatch'
-  | 'streets'
-  | 'rooftop'
-  | 'laststand';
+  | 'l01' | 'l02' | 'l03' | 'l04' | 'l05'
+  | 'l06' | 'l07' | 'l08' | 'l09' | 'l10'
+  | 'l11' | 'l12' | 'l13' | 'l14' | 'l15'
+  | 'l16' | 'l17' | 'l18' | 'l19' | 'l20'
+  | 'l21' | 'l22' | 'l23' | 'l24' | 'l25';
 
-export type MissionKind = 'goto' | 'kills' | 'chests' | 'drive' | 'survive' | 'wave';
+export type MissionKind = 'goto' | 'kills' | 'chests' | 'drive' | 'survive';
 
 export interface ZombieWave {
   health: number;
@@ -28,98 +26,83 @@ export interface MissionTarget {
 
 export interface MissionDef {
   id: MissionId;
+  n: number;
   title: string;
   blurb: string;
   hint: string;
   reward: number;
   kind: MissionKind;
+  timeLimit: number;
   count?: number;
-  duration?: number;
   night?: boolean;
   target?: MissionTarget;
   wave?: ZombieWave;
 }
 
+const PARK = { x: 14, z: 14, r: 6, label: 'Park' };
+const FOREST = { x: 50, z: 0, r: 18, label: 'Forest' };
+const COTTAGE = { x: 22, z: 6, r: 8, label: 'Cottage' };
+const CABIN = { x: -12, z: 18, r: 8, label: 'Cabin' };
+const MODERN = { x: 8, z: -18, r: 8, label: 'Modern house' };
+const EAST = { x: 55, z: 10, r: 10, label: 'East tower' };
+const WEST = { x: -55, z: -10, r: 10, label: 'West tower' };
+const SPIRE = { x: 28, z: -22, r: 8, label: 'Spire' };
+const NORTH_APT = { x: -40, y: 24, z: 40, r: 10, label: 'Rooftop' };
+const SOUTH_APT = { x: 40, z: -40, r: 10, label: 'South block' };
+
+const mild: ZombieWave = { health: 5, speedMult: 1.12, respawn: 4 };
+const hard: ZombieWave = { health: 7, speedMult: 1.25, respawn: 3 };
+const brutal: ZombieWave = { health: 9, speedMult: 1.4, respawn: 2 };
+
+function L(
+  n: number,
+  title: string,
+  blurb: string,
+  hint: string,
+  kind: MissionKind,
+  timeLimit: number,
+  extra: Partial<MissionDef> = {}
+): MissionDef {
+  const id = `l${String(n).padStart(2, '0')}` as MissionId;
+  return {
+    id,
+    n,
+    title,
+    blurb,
+    hint,
+    kind,
+    timeLimit,
+    reward: 12 + n * 6,
+    ...extra,
+  };
+}
+
 export const MISSIONS: MissionDef[] = [
-  {
-    id: 'park',
-    title: 'Town Park',
-    blurb: 'Find the pond in the town park.',
-    hint: 'Head toward the trees and water just east of spawn.',
-    reward: 20,
-    kind: 'goto',
-    target: { x: 14, z: 14, r: 6, label: 'Park' },
-  },
-  {
-    id: 'firstblood',
-    title: 'First Blood',
-    blurb: 'Hunt 5 zombies around the city.',
-    hint: 'They wander the forest ring. Follow the waypoint into the trees.',
-    reward: 40,
-    kind: 'kills',
-    count: 5,
-    target: { x: 50, z: 0, r: 18, label: 'Forest' },
-  },
-  {
-    id: 'scavenger',
-    title: 'Scavenger',
-    blurb: 'Loot a chest inside a house.',
-    hint: 'The cottage east of spawn has a chest against the wall. Look at it and interact.',
-    reward: 30,
-    kind: 'chests',
-    count: 1,
-    target: { x: 22, z: 6, r: 8, label: 'Cottage' },
-  },
-  {
-    id: 'wheels',
-    title: 'Wheels',
-    blurb: 'Drive a car to the east skyscraper.',
-    hint: 'Hop in a parked car (E / DRIVE) and follow the road toward the tall tower.',
-    reward: 50,
-    kind: 'drive',
-    target: { x: 55, z: 10, r: 10, label: 'East Tower' },
-  },
-  {
-    id: 'nightwatch',
-    title: 'Night Watch',
-    blurb: 'Survive 45 seconds after dark.',
-    hint: 'Street lamps keep zombies back. Stay in the light if you get swarmed.',
-    reward: 60,
-    kind: 'survive',
-    duration: 45,
-    night: true,
-  },
-  {
-    id: 'streets',
-    title: 'Clear the Streets',
-    blurb: 'Kill 12 zombies during the night.',
-    hint: 'Night is locked on. Push out from the lamps and hunt.',
-    reward: 80,
-    kind: 'kills',
-    count: 12,
-    night: true,
-    wave: { health: 5, speedMult: 1.15, respawn: 4 },
-  },
-  {
-    id: 'rooftop',
-    title: 'High Rise',
-    blurb: 'Reach the apartment rooftop on the north-west block.',
-    hint: 'Find the apartment at the treeline and climb the stairwell to the roof.',
-    reward: 70,
-    kind: 'goto',
-    target: { x: -40, y: 24, z: 40, r: 10, label: 'Rooftop' },
-  },
-  {
-    id: 'laststand',
-    title: 'Last Stand',
-    blurb: 'Hold the city for 60 seconds through a night wave.',
-    hint: 'Faster, tougher zombies. Keep moving. Lamps still help.',
-    reward: 120,
-    kind: 'survive',
-    duration: 60,
-    night: true,
-    wave: { health: 8, speedMult: 1.35, respawn: 3 },
-  },
+  L(1, 'Park', 'Reach the town park pond.', 'Head east of spawn toward the trees and water.', 'goto', 60, { target: PARK }),
+  L(2, 'First Blood', 'Kill 3 zombies.', 'They haunt the forest ring. Follow the waypoint.', 'kills', 75, { count: 3, target: FOREST }),
+  L(3, 'Cottage Stash', 'Loot a chest in the cottage.', 'Cottage east of spawn. Look at the chest and interact.', 'chests', 90, { count: 1, target: COTTAGE }),
+  L(4, 'East Walk', 'Reach the east skyscraper.', 'Follow the road east to the tall tower.', 'goto', 80, { target: EAST }),
+  L(5, 'Hunter', 'Kill 8 zombies.', 'Push out to the treeline and hunt.', 'kills', 90, { count: 8, target: FOREST }),
+  L(6, 'Joyride', 'Drive a car to the east tower.', 'Hop in a parked car and take the east road.', 'drive', 80, { target: EAST }),
+  L(7, 'Cabin Call', 'Reach the north cabin.', 'Northwest of spawn, among the trees.', 'goto', 70, { target: CABIN }),
+  L(8, 'Night Watch', 'Stay alive until dawn.', 'Lamps keep zombies back. Do not die.', 'survive', 40, { night: true }),
+  L(9, 'Two Chests', 'Loot 2 chests.', 'Houses around town all have chests inside.', 'chests', 100, { count: 2, target: COTTAGE }),
+  L(10, 'Treeline', 'Kill 12 zombies.', 'Harder respawns at the forest edge.', 'kills', 90, { count: 12, target: FOREST, wave: mild }),
+  L(11, 'High Rise', 'Reach the north apartment roof.', 'Climb the stairwell. Ground floor does not count.', 'goto', 110, { target: NORTH_APT }),
+  L(12, 'Night Streets', 'Kill 10 zombies at night.', 'Night is locked. Hunt under the lamps.', 'kills', 90, { count: 10, night: true, wave: mild }),
+  L(13, 'West Tower', 'Reach the west skyscraper.', 'Take the west road out of town.', 'goto', 90, { target: WEST }),
+  L(14, 'Cross Town', 'Drive to the west tower.', 'Steal a car and cut across the city.', 'drive', 85, { target: WEST }),
+  L(15, 'Blackout', 'Survive the night.', 'Tougher zombies. Keep moving.', 'survive', 50, { night: true, wave: hard }),
+  L(16, 'Modern Haul', 'Loot a chest in the modern house.', 'South of spawn, glass and concrete.', 'chests', 80, { count: 1, target: MODERN }),
+  L(17, 'Culling', 'Kill 15 zombies.', 'Clear a path through the forest ring.', 'kills', 100, { count: 15, target: FOREST, wave: hard }),
+  L(18, 'South Block', 'Reach the south apartment.', 'Southeast treeline, the long housing block.', 'goto', 90, { target: SOUTH_APT }),
+  L(19, 'Park Circuit', 'Drive back to the park.', 'Find a car and return to the pond.', 'drive', 70, { target: PARK }),
+  L(20, 'Midnight Hunt', 'Kill 18 zombies at night.', 'Fast respawns. Do not get surrounded.', 'kills', 110, { count: 18, night: true, wave: hard }),
+  L(21, 'The Spire', 'Reach the south tower.', 'The tall house south-east of spawn.', 'goto', 100, { target: SPIRE }),
+  L(22, 'Treasure Run', 'Loot 3 chests.', 'Hit three different houses before time runs out.', 'chests', 120, { count: 3, target: COTTAGE }),
+  L(23, 'Hold Fast', 'Survive a hard night.', 'Brutal wave. Lamps still help.', 'survive', 60, { night: true, wave: brutal }),
+  L(24, 'Onslaught', 'Kill 25 zombies.', 'Keep the pressure on. They come back fast.', 'kills', 120, { count: 25, target: FOREST, wave: brutal }),
+  L(25, 'Last Light', 'Kill 30 zombies before the clock hits zero.', 'Final hunt. Night, brutal wave, no mercy.', 'kills', 90, { count: 30, night: true, wave: brutal, target: FOREST }),
 ];
 
 export const MISSION_ORDER: MissionId[] = MISSIONS.map((m) => m.id);
@@ -142,6 +125,13 @@ export function isUnlocked(id: MissionId, completed: ReadonlySet<string>): boole
 
 export function nextMission(completed: ReadonlySet<string>): MissionId | null {
   return MISSION_ORDER.find((id) => !completed.has(id)) ?? null;
+}
+
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
 const LS_PREFIX = 'blockgame.missions.';
@@ -176,10 +166,7 @@ export function mergeMissions(...lists: Array<Iterable<string> | undefined | nul
   return s;
 }
 
-export function raidZombieWave(wave: number): ZombieWave {
-  if (wave >= 3) return { health: 9, speedMult: 1.35, respawn: 2 };
-  if (wave >= 2) return { health: 7, speedMult: 1.2, respawn: 3 };
-  return { health: 5, speedMult: 1.1, respawn: 4 };
-}
-
-export const RAID_BONUS = [0, 40, 70, 120];
+/** Seconds per level — keep in sync with MISSIONS (used by the MP server copy). */
+export const LEVEL_TIME: Record<MissionId, number> = Object.fromEntries(
+  MISSIONS.map((m) => [m.id, m.timeLimit])
+) as Record<MissionId, number>;

@@ -112,15 +112,14 @@ day/night, touch/mouse). 🛒 is the shop.
 
 Lamplight repels zombies at night. You can fight from animal-back.
 
-## Missions
+## Levels
 
-Eight sequential jobs in the existing city (park, kills, chest, drive, night
-survive, night hunt, rooftop, last stand). Open ☰ → Missions, or accept the
-first-run prompt. Completing one auto-starts the next. Rewards are shop points.
+25 timed jobs on a numbered grid (1–25). Free Play is roam-only. Levels mode
+unlocks boxes in order; finish the objective before the clock hits zero.
+Rewards are shop points.
 
-## Multiplayer Night Raid
+## Multiplayer races
 
-Any joined player can start a Night Raid from pause. The server tracks a shared
-kill goal across three night waves; each client still simulates its own zombies
-and reports kills. Win a wave for bonus points. Pause also has a ping (beacon
-others can see) and a nearby-player list.
+The same 25-box grid. Anyone picks a level; everyone is on the same clock.
+First player to finish the objective wins. Pause has a ping and a nearby-player
+list.

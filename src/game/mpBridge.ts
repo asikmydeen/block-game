@@ -1,14 +1,13 @@
 // Tiny handle so HUD / combat can talk to the multiplayer socket without
 // prop-drilling through the R3F tree. RemotePlayers owns the WebSocket.
 
-export type RaidPhase = 'idle' | 'active' | 'rest' | 'won' | 'failed';
+export type RacePhase = 'idle' | 'active' | 'won' | 'failed';
 
-export interface RaidState {
-  phase: RaidPhase;
-  wave: number;
-  kills: number;
-  goal: number;
+export interface RaceState {
+  phase: RacePhase;
+  levelId: string | null;
   endsAt: number;
+  winner: string | null;
 }
 
 export interface MpPlayerInfo {
@@ -30,21 +29,20 @@ type SendFn = (msg: Record<string, unknown>) => void;
 
 export const mpBridge = {
   send: null as SendFn | null,
-  raidStart() {
-    this.send?.({ type: 'raid_start' });
+  levelStart(id: string) {
+    this.send?.({ type: 'level_start', id });
   },
-  raidKill() {
-    this.send?.({ type: 'raid_kill' });
+  levelComplete(id: string) {
+    this.send?.({ type: 'level_complete', id });
   },
   ping(x: number, y: number, z: number) {
     this.send?.({ type: 'ping', x, y, z });
   },
 };
 
-export const RAID_IDLE: RaidState = {
+export const RACE_IDLE: RaceState = {
   phase: 'idle',
-  wave: 0,
-  kills: 0,
-  goal: 0,
+  levelId: null,
   endsAt: 0,
+  winner: null,
 };

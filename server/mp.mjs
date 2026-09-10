@@ -1,21 +1,13 @@
 import { WebSocketServer } from 'ws';
 import * as db from './db.mjs';
+import { LEVEL_TIME, isLevelId } from './levels.mjs';
 
-// Realtime presence hub. Identity comes from the account session token, so the
-// roster carries real usernames instead of client-supplied nicknames.
-// Also hosts a session-only Night Raid (shared kill goal, local zombies).
+// Realtime presence + timed level races. Identity comes from the session token.
 
-const TICK_MS = 100; // roster broadcast rate (10/s)
+const TICK_MS = 100;
 const STALE_MS = 30_000;
 const PING_COOLDOWN_MS = 2000;
-
-const RAID_WAVES = [
-  { goal: 15, durationMs: 75_000 },
-  { goal: 25, durationMs: 75_000 },
-  { goal: 40, durationMs: 75_000 },
-];
-const REST_MS = 12_000;
-const RESULT_MS = 8_000;
+const RESULT_MS = 6_000;
 
 function clamp(v, limit) {
   const n = Number(v);
@@ -24,23 +16,22 @@ function clamp(v, limit) {
 
 export function setupMultiplayer(server, { log = console } = {}) {
   const wss = new WebSocketServer({ server, path: '/api/mp' });
-  const players = new Map(); // ws -> state
+  const players = new Map();
 
-  const raid = {
-    phase: 'idle', // idle | active | rest | won | failed
-    wave: 0,
-    kills: 0,
-    goal: 0,
+  const race = {
+    phase: 'idle', // idle | active | won | failed
+    levelId: null,
     endsAt: 0,
+    winner: null,
+    finished: new Set(),
   };
 
-  const raidSnapshot = () => ({
-    type: 'raid',
-    phase: raid.phase,
-    wave: raid.wave,
-    kills: raid.kills,
-    goal: raid.goal,
-    endsAt: raid.endsAt,
+  const raceSnapshot = () => ({
+    type: 'race',
+    phase: race.phase,
+    levelId: race.levelId,
+    endsAt: race.endsAt,
+    winner: race.winner,
   });
 
   const broadcast = (obj) => {
@@ -50,45 +41,23 @@ export function setupMultiplayer(server, { log = console } = {}) {
     }
   };
 
-  const startWave = (n) => {
-    const spec = RAID_WAVES[n - 1];
-    raid.phase = 'active';
-    raid.wave = n;
-    raid.kills = 0;
-    raid.goal = spec.goal;
-    raid.endsAt = Date.now() + spec.durationMs;
+  const resetRace = () => {
+    race.phase = 'idle';
+    race.levelId = null;
+    race.endsAt = 0;
+    race.winner = null;
+    race.finished = new Set();
   };
 
-  const resetRaid = () => {
-    raid.phase = 'idle';
-    raid.wave = 0;
-    raid.kills = 0;
-    raid.goal = 0;
-    raid.endsAt = 0;
-  };
-
-  const tickRaid = () => {
+  const tickRace = () => {
     const now = Date.now();
-    if (raid.phase === 'active' && now >= raid.endsAt) {
-      if (raid.kills >= raid.goal) {
-        if (raid.wave >= RAID_WAVES.length) {
-          raid.phase = 'won';
-          raid.endsAt = now + RESULT_MS;
-        } else {
-          raid.phase = 'rest';
-          raid.endsAt = now + REST_MS;
-        }
-      } else {
-        raid.phase = 'failed';
-        raid.endsAt = now + RESULT_MS;
-      }
-      broadcast(raidSnapshot());
-    } else if (raid.phase === 'rest' && now >= raid.endsAt) {
-      startWave(raid.wave + 1);
-      broadcast(raidSnapshot());
-    } else if ((raid.phase === 'won' || raid.phase === 'failed') && now >= raid.endsAt) {
-      resetRaid();
-      broadcast(raidSnapshot());
+    if (race.phase === 'active' && now >= race.endsAt) {
+      race.phase = race.winner ? 'won' : 'failed';
+      race.endsAt = now + RESULT_MS;
+      broadcast(raceSnapshot());
+    } else if ((race.phase === 'won' || race.phase === 'failed') && now >= race.endsAt) {
+      resetRace();
+      broadcast(raceSnapshot());
     }
   };
 
@@ -125,7 +94,7 @@ export function setupMultiplayer(server, { log = console } = {}) {
       try {
         msg = JSON.parse(String(raw));
       } catch {
-        return; // ignore malformed
+        return;
       }
       state.lastSeen = Date.now();
 
@@ -172,7 +141,7 @@ export function setupMultiplayer(server, { log = console } = {}) {
             color: state.color,
           })
         );
-        ws.send(JSON.stringify(raidSnapshot()));
+        ws.send(JSON.stringify(raceSnapshot()));
         return;
       }
 
@@ -186,28 +155,33 @@ export function setupMultiplayer(server, { log = console } = {}) {
         return;
       }
 
-      if (msg.type === 'raid_start') {
-        if (raid.phase === 'active' || raid.phase === 'rest') return;
-        startWave(1);
-        log.info?.({ username: state.username }, 'mp: night raid started');
-        broadcast(raidSnapshot());
+      if (msg.type === 'level_start') {
+        const id = typeof msg.id === 'string' ? msg.id : '';
+        if (!isLevelId(id)) return;
+        if (race.phase === 'active') return;
+        const secs = LEVEL_TIME[id];
+        race.phase = 'active';
+        race.levelId = id;
+        race.winner = null;
+        race.finished = new Set();
+        race.endsAt = Date.now() + secs * 1000;
+        log.info?.({ username: state.username, id }, 'mp: level race started');
+        broadcast(raceSnapshot());
         return;
       }
 
-      if (msg.type === 'raid_kill') {
-        if (raid.phase !== 'active') return;
-        raid.kills += 1;
-        if (raid.kills >= raid.goal) {
-          const now = Date.now();
-          if (raid.wave >= RAID_WAVES.length) {
-            raid.phase = 'won';
-            raid.endsAt = now + RESULT_MS;
-          } else {
-            raid.phase = 'rest';
-            raid.endsAt = now + REST_MS;
-          }
+      if (msg.type === 'level_complete') {
+        const id = typeof msg.id === 'string' ? msg.id : '';
+        if (race.phase !== 'active' || id !== race.levelId) return;
+        if (race.finished.has(state.playerId)) return;
+        race.finished.add(state.playerId);
+        if (!race.winner) {
+          race.winner = state.username;
+          race.phase = 'won';
+          race.endsAt = Date.now() + RESULT_MS;
+          log.info?.({ username: state.username, id }, 'mp: level race won');
         }
-        broadcast(raidSnapshot());
+        broadcast(raceSnapshot());
         return;
       }
 
@@ -234,7 +208,7 @@ export function setupMultiplayer(server, { log = console } = {}) {
 
   const timer = setInterval(() => {
     const now = Date.now();
-    tickRaid();
+    tickRace();
     for (const [ws, p] of players) {
       if (now - p.lastSeen > STALE_MS) {
         try {
