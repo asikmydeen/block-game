@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
+import { groundYUnder, FLOOR_TOP_Y } from '../game/ground';
 import { FOREST_INNER_R } from '../game/decorations';
 import { RIDE_SPECS, animalsRegistry, ridingState, riderCombat, type RideableKind } from '../game/animals';
 import { drivingState } from '../game/cars';
@@ -38,22 +39,14 @@ interface AnimalData {
   homeZ: number;
 }
 
-const FLOOR_TOP_Y = 12;
 
 function isSolid(world: WorldState, x: number, y: number, z: number): boolean {
   const b = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
   return !!b && b !== 'air' && b !== 'water';
 }
 
-function findGroundY(world: WorldState, x: number, z: number): number {
-  const ix = Math.floor(x);
-  const iz = Math.floor(z);
-  for (let y = 30; y >= 0; y--) {
-    const b = world.getBlock(ix, y, iz);
-    if (b && b !== 'air' && b !== 'water') return y + 1;
-  }
-  return FLOOR_TOP_Y + 1;
-}
+const findGroundY = (world: WorldState, x: number, z: number, currentY: number) =>
+  groundYUnder(world, x, z, currentY);
 
 const HERD_SPECS: Array<{ kind: AnimalKind; count: number; speed: number }> = [
   { kind: 'pig', count: 5, speed: 0.7 },
@@ -127,7 +120,7 @@ export function Animals({ world, playerPosRef, touchMode, onNearAnimal }: Animal
         const sideZ = Math.cos(a.dir) * 1.6;
         const px = a.pos.x + sideX;
         const pz = a.pos.z + sideZ;
-        playerPos.set(px, findGroundY(world, px, pz), pz);
+        playerPos.set(px, findGroundY(world, px, pz, a.pos.y + 1), pz);
         riddenIdRef.current = null;
         ridingState.active = false;
         ridingState.justExited = true;
@@ -225,7 +218,7 @@ export function Animals({ world, playerPosRef, touchMode, onNearAnimal }: Animal
             a.rideVel = 0;
           }
         }
-        a.pos.y = findGroundY(world, a.pos.x, a.pos.z);
+        a.pos.y = findGroundY(world, a.pos.x, a.pos.z, a.pos.y);
         a.walking = Math.abs(a.rideVel) > 0.1;
 
         playerPosRef.current.set(a.pos.x, a.pos.y, a.pos.z);
@@ -262,7 +255,7 @@ export function Animals({ world, playerPosRef, touchMode, onNearAnimal }: Animal
           }
         }
 
-        a.pos.y = findGroundY(world, a.pos.x, a.pos.z);
+        a.pos.y = findGroundY(world, a.pos.x, a.pos.z, a.pos.y);
       }
 
       const g = groupRefs.current[i];

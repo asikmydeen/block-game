@@ -1,0 +1,56 @@
+{
+  "description": "Template/example of a COMPLETE release-evidence bundle for one immutable build ID. It is accepted only because every required criterion 12.1-12.16 is present and passing and the manifest is valid and secret-free. Copy this into an evidence directory named exactly by the buildId and replace the placeholder hashes/checksums with the real ones. No secrets are ever tracked here.",
+  "manifest": {
+    "schemaVersion": 1,
+    "buildId": "EXAMPLE-0000-00-00T00-00-00Z-0000000",
+    "capacitorVersion": "7.4.4",
+    "secureStorageVersion": "7.1.6",
+    "compatibility": {
+      "source": "validation/mobile/dependency-compatibility.json",
+      "checkedAt": "2026-09-08T21:25:46.751Z",
+      "qualifyingUpstreamActivity": "https://github.com/aparajita/capacitor-secure-storage/commits"
+    },
+    "endpointHosts": { "api": "api.example.com", "webSocket": "api.example.com" },
+    "nativeVersions": { "ios": "17.0", "androidMinSdk": 31 },
+    "testCommands": ["npm run typecheck", "npx vitest run", "npm run build"],
+    "devices": [
+      { "platform": "ios", "model": "iPhone 13", "os": "17.5" },
+      { "platform": "android", "model": "Pixel 7", "os": "14" }
+    ],
+    "automationIdentity": "release-pipeline",
+    "artifacts": [
+      {
+        "name": "ios.ipa",
+        "url": "https://artifacts.example.com/EXAMPLE/ios.ipa",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "name": "android.aab",
+        "url": "https://artifacts.example.com/EXAMPLE/android.aab",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ],
+    "hashes": {
+      "lockfile": "2222222222222222222222222222222222222222222222222222222222222222",
+      "webBuild": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  },
+  "criteria": [
+    { "id": "12.1", "status": "pass", "evidenceRef": "command-build.json" },
+    { "id": "12.2", "status": "pass", "evidenceRef": "native-sync.json" },
+    { "id": "12.3", "status": "pass", "evidenceRef": "native-ios-artifact.json" },
+    { "id": "12.4", "status": "pass", "evidenceRef": "native-android-artifact.json" },
+    { "id": "12.5", "status": "pass", "evidenceRef": "ios-device.json" },
+    { "id": "12.6", "status": "pass", "evidenceRef": "android-device.json" },
+    { "id": "12.7", "status": "pass", "evidenceRef": "browser-regression.json" },
+    { "id": "12.8", "status": "pass", "evidenceRef": "secure-storage.json" },
+    { "id": "12.9", "status": "pass", "evidenceRef": "endpoint-inspection.json" },
+    { "id": "12.10", "status": "pass", "evidenceRef": "origin-approved.json" },
+    { "id": "12.11", "status": "pass", "evidenceRef": "origin-rejected.json" },
+    { "id": "12.12", "status": "pass", "evidenceRef": "lifecycle.json" },
+    { "id": "12.13", "status": "pass", "evidenceRef": "network.json" },
+    { "id": "12.14", "status": "pass", "evidenceRef": "touch-matrix.json" },
+    { "id": "12.15", "status": "pass", "evidenceRef": "safe-area.json" },
+    { "id": "12.16", "status": "pass", "evidenceRef": "performance.json" }
+  ]
+}

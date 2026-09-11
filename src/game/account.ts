@@ -3,6 +3,13 @@
 // Same computer -> same account: a random deviceId is stored in localStorage on
 // first visit and mapped to the account server-side, so return visits resume
 // silently. Entering a username switches to (or claims) that account.
+//
+// Every REST call routes through the shared ApiClient, which resolves an
+// absolute URL from the authoritative EndpointConfig and attaches the bearer
+// token as a header only. The public account API and route payloads below are
+// unchanged.
+
+import { createApiClient, getEndpointConfig, type ApiClient } from './apiClient';
 
 export interface Account {
   id: string;
@@ -72,19 +79,27 @@ function setToken(next: string | null) {
   else clearLocal(TOKEN_KEY);
 }
 
+let apiClient: ApiClient | null = null;
+function getClient(): ApiClient {
+  if (!apiClient) {
+    apiClient = createApiClient({
+      config: getEndpointConfig(),
+      getToken: () => token,
+      // A rejected/expired session clears the in-memory + stored token so the
+      // next resume falls back to device-based sign-in.
+      onUnauthorized: () => setToken(null),
+    });
+  }
+  return apiClient;
+}
+
+/** The shared REST/beacon client, used by the page-hide progress flush. */
+export function getAccountApiClient(): ApiClient {
+  return getClient();
+}
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
-  const text = await res.text();
-  const body = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(body?.error || `request failed (${res.status})`);
-  return body as T;
+  return getClient().request<T>(path, init);
 }
 
 type AuthResponse = { token: string; deviceId: string; player: Account; created: boolean };

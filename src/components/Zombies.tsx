@@ -2,6 +2,7 @@ import { useRef, useEffect, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
+import { groundYUnder, FLOOR_TOP_Y } from '../game/ground';
 import { powerState } from '../game/powers';
 import { combatRegistry } from '../game/combat';
 import { Humanoid, createLimbs, type HumanoidLimbs } from './Humanoid';
@@ -23,7 +24,6 @@ interface ZombieData {
   hitTimer: number;
 }
 
-const FLOOR_TOP_Y = 12;
 // Zombies emerge from the forest ring surrounding the city (radius ~74-102,
 // see decorations.ts), so their density rises as you approach the treeline.
 // A few stragglers still roam the inner city.
@@ -49,15 +49,8 @@ const ATTACK_RANGE = 1.6;
 const ATTACK_COOLDOWN = 1.0;
 const ATTACK_DAMAGE = 1;
 
-function findGroundY(world: WorldState, x: number, z: number): number {
-  const ix = Math.floor(x);
-  const iz = Math.floor(z);
-  for (let y = 30; y >= 0; y--) {
-    const b = world.getBlock(ix, y, iz);
-    if (b && b !== 'air' && b !== 'water') return y + 1;
-  }
-  return FLOOR_TOP_Y + 1;
-}
+const findGroundY = (world: WorldState, x: number, z: number, currentY: number) =>
+  groundYUnder(world, x, z, currentY);
 
 function isSolid(world: WorldState, x: number, y: number, z: number): boolean {
   const b = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
@@ -267,7 +260,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive, night, wav
         }
       }
 
-      z.pos.y = findGroundY(world, z.pos.x, z.pos.z);
+      z.pos.y = findGroundY(world, z.pos.x, z.pos.z, z.pos.y);
 
       z.attackCooldown -= dt;
       const verticalDelta = Math.abs(player.y - z.pos.y);

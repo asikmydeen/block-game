@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
+import { groundYUnder } from '../game/ground';
 import { CAR_SPECS, type CarKind, type CarInfo, drivingState, carsRegistry } from '../game/cars';
 import { touchState } from './TouchControls';
 import { powerState } from '../game/powers';
@@ -63,15 +64,8 @@ function isSolid(world: WorldState, x: number, y: number, z: number): boolean {
   return !!b && b !== 'air' && b !== 'water';
 }
 
-function findGroundY(world: WorldState, x: number, z: number): number {
-  const ix = Math.floor(x);
-  const iz = Math.floor(z);
-  for (let y = 30; y >= 0; y--) {
-    const b = world.getBlock(ix, y, iz);
-    if (b && b !== 'air' && b !== 'water') return y + 1;
-  }
-  return 13;
-}
+const findGroundY = (world: WorldState, x: number, z: number, currentY: number) =>
+  groundYUnder(world, x, z, currentY);
 
 // Ray-march through blocks to find the first solid hit distance (for occlusion)
 function firstBlockT(world: WorldState, origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number): number {
@@ -177,7 +171,7 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
             break;
           }
         }
-        exit.y = findGroundY(worldRef.current, exit.x, exit.z);
+        exit.y = findGroundY(worldRef.current, exit.x, exit.z, car.pos.y + 1);
         playerPosRef.current.copy(exit);
         drivingIdRef.current = null;
         drivingState.active = false;
@@ -502,7 +496,7 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
         car.aiPause = 1.2;
       }
     } else {
-      const groundY = findGroundY(world, nx, nz);
+      const groundY = findGroundY(world, nx, nz, car.pos.y);
       if (Math.abs(groundY - car.pos.y) <= 1.2) {
         car.pos.x = nx;
         car.pos.z = nz;

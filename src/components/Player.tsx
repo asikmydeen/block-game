@@ -9,6 +9,8 @@ import { touchState, consumeLookDelta, consumePlace } from './TouchControls';
 import { combatRegistry, getWeapon, type WeaponType } from '../game/combat';
 import { drivingState, carsRegistry } from '../game/cars';
 import { ridingState, riderCombat } from '../game/animals';
+import { localEmote } from '../game/multiplayer';
+import { applyEmotePose } from './RemotePlayers';
 import { powerState } from '../game/powers';
 import { Humanoid, createLimbs } from './Humanoid';
 
@@ -126,6 +128,8 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
   const weaponRef = useRef(weapon);
   const cameraModeRef = useRef(cameraMode);
   const bodyRef = useRef<THREE.Group>(null);
+  // Inner group is what emotes hop/tilt, so the outer group keeps owning position.
+  const bodyInnerRef = useRef<THREE.Group>(null);
   const bodyLimbsRef = useRef(createLimbs());
   const attackCooldownRef = useRef(0);
   const firingRef = useRef(false);
@@ -520,6 +524,9 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     positionRef.current.copy(pos);
     if (playerPosRef?.current) playerPosRef.current.copy(pos);
 
+    // Continuous position lives here in refs. onPositionChange forwards it to
+    // the HUD sampler (Game.tsx), which publishes to React at <= 5 Hz — no
+    // per-frame setState. (task 10.6)
     const eye = new THREE.Vector3(pos.x, pos.y + PLAYER_HEIGHT - 0.1, pos.z);
     if (isThirdPerson) {
       // Orbit behind the eye along the opposite of the look direction,
@@ -543,46 +550,52 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
         // Camera looks along its local -Z, but the avatar's face is on +Z;
         // add half a turn so the character faces away from the camera.
         bodyRef.current.rotation.y = yawRef.current + Math.PI;
-        // Walk swing driven by horizontal speed
         const limbs = bodyLimbsRef.current;
-        const moving = Math.hypot(velocityRef.current.x, velocityRef.current.z) > 0.5;
-        const walk = moving ? Math.sin(performance.now() * 0.009) * 0.65 : 0;
-        const attackT = swingTimerRef.current;
-        if (attackT > 0) {
-          const u = Math.min(1, (SWING_DUR - attackT) / SWING_DUR);
-          const punch = Math.sin(u * Math.PI);
-          const melee = !getWeapon(weaponRef.current).ranged;
-          if (melee) {
-            if (limbs.rightArm) {
-              limbs.rightArm.rotation.x = -0.25 - punch * 1.7;
-              limbs.rightArm.rotation.z = punch * 0.55;
-            }
-            if (limbs.leftArm) {
-              limbs.leftArm.rotation.x = walk * 0.25 + punch * 0.35;
-              limbs.leftArm.rotation.z = 0;
+
+        // Your own emote plays on your avatar too, so third-person shows what
+        // everyone else is seeing. Emotes take priority; otherwise the
+        // attack/walk animation runs.
+        const emoting = localEmote.name && Date.now() < localEmote.until ? localEmote.name : null;
+        if (!applyEmotePose(limbs, bodyInnerRef.current, emoting, performance.now() * 0.001)) {
+          const moving = Math.hypot(velocityRef.current.x, velocityRef.current.z) > 0.5;
+          const walk = moving ? Math.sin(performance.now() * 0.009) * 0.65 : 0;
+          const attackT = swingTimerRef.current;
+          if (attackT > 0) {
+            const u = Math.min(1, (SWING_DUR - attackT) / SWING_DUR);
+            const punch = Math.sin(u * Math.PI);
+            const melee = !getWeapon(weaponRef.current).ranged;
+            if (melee) {
+              if (limbs.rightArm) {
+                limbs.rightArm.rotation.x = -0.25 - punch * 1.7;
+                limbs.rightArm.rotation.z = punch * 0.55;
+              }
+              if (limbs.leftArm) {
+                limbs.leftArm.rotation.x = walk * 0.25 + punch * 0.35;
+                limbs.leftArm.rotation.z = 0;
+              }
+            } else {
+              if (limbs.rightArm) {
+                limbs.rightArm.rotation.x = -1.15 - punch * 0.4;
+                limbs.rightArm.rotation.z = 0.2;
+              }
+              if (limbs.leftArm) {
+                limbs.leftArm.rotation.x = -0.95;
+                limbs.leftArm.rotation.z = -0.25;
+              }
             }
           } else {
-            if (limbs.rightArm) {
-              limbs.rightArm.rotation.x = -1.15 - punch * 0.4;
-              limbs.rightArm.rotation.z = 0.2;
-            }
             if (limbs.leftArm) {
-              limbs.leftArm.rotation.x = -0.95;
-              limbs.leftArm.rotation.z = -0.25;
+              limbs.leftArm.rotation.x = walk;
+              limbs.leftArm.rotation.z = 0;
+            }
+            if (limbs.rightArm) {
+              limbs.rightArm.rotation.x = -walk;
+              limbs.rightArm.rotation.z = 0;
             }
           }
-        } else {
-          if (limbs.leftArm) {
-            limbs.leftArm.rotation.x = walk;
-            limbs.leftArm.rotation.z = 0;
-          }
-          if (limbs.rightArm) {
-            limbs.rightArm.rotation.x = -walk;
-            limbs.rightArm.rotation.z = 0;
-          }
+          if (limbs.leftLeg) limbs.leftLeg.rotation.x = -walk;
+          if (limbs.rightLeg) limbs.rightLeg.rotation.x = walk;
         }
-        if (limbs.leftLeg) limbs.leftLeg.rotation.x = -walk;
-        if (limbs.rightLeg) limbs.rightLeg.rotation.x = walk;
       }
     }
 
@@ -658,7 +671,9 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
 
       {/* Local player body, shown in third-person view */}
       <group ref={bodyRef} visible={false}>
-        <Humanoid skin="#ffd9b3" shirt="#ff8800" pants="#3a5a8c" limbs={bodyLimbsRef.current} />
+        <group ref={bodyInnerRef}>
+          <Humanoid skin="#ffd9b3" shirt="#ff8800" pants="#3a5a8c" limbs={bodyLimbsRef.current} />
+        </group>
       </group>
 
       {/* First-person weapon viewmodel */}

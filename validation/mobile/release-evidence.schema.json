@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "description": "Release-acceptance evidence contract for the capacitor-mobile-app feature. A candidate's evidence directory is keyed by an immutable build ID and holds a release-manifest.json plus a criteria.json (the deterministic results for criteria 12.1-12.16). scripts/native/release-gate.mjs validates the manifest and applies all-or-nothing, fully-diagnostic acceptance. No secrets are ever tracked here.",
+  "manifest": {
+    "required": [
+      "buildId",
+      "capacitorVersion",
+      "secureStorageVersion",
+      "compatibility",
+      "endpointHosts",
+      "nativeVersions",
+      "testCommands",
+      "devices",
+      "automationIdentity",
+      "artifacts",
+      "hashes"
+    ],
+    "fields": {
+      "buildId": "immutable release build identifier; must match the evidence directory name",
+      "capacitorVersion": "exact semver pin (no range operator), e.g. 7.4.4",
+      "secureStorageVersion": "exact secure-storage plugin pin, e.g. 7.1.6",
+      "compatibility": {
+        "source": "path to the dependency-compatibility record",
+        "checkedAt": "ISO date the compatibility window was verified",
+        "qualifyingUpstreamActivity": "link to qualifying upstream commit/release activity"
+      },
+      "endpointHosts": {
+        "api": "bare production API host (no scheme, path, credentials, query, or fragment)",
+        "webSocket": "bare production WebSocket host (no scheme/path/credentials)"
+      },
+      "nativeVersions": { "ios": "iOS deployment floor", "androidMinSdk": "Android min SDK integer" },
+      "testCommands": "array of the exact commands run for this candidate",
+      "devices": "array of { platform, model, os } target devices",
+      "automationIdentity": "identity of the automation that produced the evidence (no secret)",
+      "artifacts": "array of { name, url, sha256 } release artifacts with 64-hex checksums (no secrets)",
+      "hashes": { "lockfile": "64-hex lockfile hash", "webBuild": "64-hex web-build hash" }
+    }
+  },
+  "criteria": {
+    "description": "Deterministic per-criterion results. Every criterion 12.1-12.16 must be present and status:pass for acceptance. Acceptance is all-or-nothing; a rejection enumerates every failed and every missing criterion ID.",
+    "requiredIds": [
+      "12.1", "12.2", "12.3", "12.4", "12.5", "12.6", "12.7", "12.8",
+      "12.9", "12.10", "12.11", "12.12", "12.13", "12.14", "12.15", "12.16"
+    ],
+    "entry": { "id": "criterion id (e.g. 12.7)", "status": "pass | fail", "evidenceRef": "path to the backing evidence file" }
+  },
+  "evidenceCategories": [
+    "command",
+    "build",
+    "browser",
+    "server",
+    "native",
+    "touch",
+    "lifecycle",
+    "network",
+    "performance"
+  ]
+}

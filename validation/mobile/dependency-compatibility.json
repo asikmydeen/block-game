@@ -1,0 +1,608 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-09-08T21:25:46.751Z",
+  "compatibilityWindowMonths": 12,
+  "targets": {
+    "capacitor": "7.4.4",
+    "nodeFloor": "20.0.0"
+  },
+  "sourceUrls": [
+    "https://registry.npmjs.org",
+    "https://api.github.com/repos/aparajita/capacitor-secure-storage/commits?per_page=1"
+  ],
+  "packages": {
+    "@capacitor/core": {
+      "selectedVersion": "7.4.4",
+      "publishedAt": "2025-10-22T11:11:47.265Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fcore/7.4.4",
+        "https://www.npmjs.com/package/@capacitor/core/v/7.4.4",
+        "https://github.com/ionic-team/capacitor"
+      ],
+      "engines": {},
+      "peerDependencies": {},
+      "dependencies": {
+        "tslib": "^2.1.0"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/cli": {
+      "selectedVersion": "7.4.4",
+      "publishedAt": "2025-10-22T11:11:33.111Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fcli/7.4.4",
+        "https://www.npmjs.com/package/@capacitor/cli/v/7.4.4",
+        "https://github.com/ionic-team/capacitor"
+      ],
+      "engines": {
+        "node": ">=20.0.0"
+      },
+      "peerDependencies": {},
+      "dependencies": {
+        "tar": "^6.1.11",
+        "open": "^8.4.0",
+        "debug": "^4.4.0",
+        "kleur": "^4.1.5",
+        "plist": "^3.1.0",
+        "tslib": "^2.8.1",
+        "rimraf": "^6.0.1",
+        "semver": "^7.6.3",
+        "xml2js": "^0.6.2",
+        "prompts": "^2.4.2",
+        "fs-extra": "^11.2.0",
+        "commander": "^12.1.0",
+        "env-paths": "^2.2.0",
+        "native-run": "^2.0.1",
+        "@ionic/utils-terminal": "^2.3.5",
+        "@ionic/utils-subprocess": "^3.0.1",
+        "@ionic/cli-framework-output": "^2.2.8"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/ios": {
+      "selectedVersion": "7.4.4",
+      "publishedAt": "2025-10-22T11:11:31.637Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fios/7.4.4",
+        "https://www.npmjs.com/package/@capacitor/ios/v/7.4.4",
+        "https://github.com/ionic-team/capacitor"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": "^7.4.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": "^7.4.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/android": {
+      "selectedVersion": "7.4.4",
+      "publishedAt": "2025-10-22T11:11:26.259Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fandroid/7.4.4",
+        "https://www.npmjs.com/package/@capacitor/android/v/7.4.4",
+        "https://github.com/ionic-team/capacitor"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": "^7.4.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": "^7.4.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@aparajita/capacitor-secure-storage": {
+      "selectedVersion": "7.1.6",
+      "publishedAt": "2025-10-24T17:01:23.421Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40aparajita%2Fcapacitor-secure-storage/7.1.6",
+        "https://www.npmjs.com/package/@aparajita/capacitor-secure-storage/v/7.1.6",
+        "https://github.com/aparajita/capacitor-secure-storage"
+      ],
+      "engines": {
+        "node": ">=20.0.0"
+      },
+      "peerDependencies": {},
+      "dependencies": {
+        "@capacitor/app": "^7.1.0",
+        "@capacitor/ios": "^7.4.4",
+        "@capacitor/core": "^7.4.4",
+        "@capacitor/android": "^7.4.4"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "dependency",
+            "packageName": "@capacitor/app",
+            "range": "^7.1.0",
+            "selectedVersion": "7.1.2",
+            "satisfied": true
+          },
+          {
+            "relationship": "dependency",
+            "packageName": "@capacitor/ios",
+            "range": "^7.4.4",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          },
+          {
+            "relationship": "dependency",
+            "packageName": "@capacitor/core",
+            "range": "^7.4.4",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          },
+          {
+            "relationship": "dependency",
+            "packageName": "@capacitor/android",
+            "range": "^7.4.4",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/app": {
+      "selectedVersion": "7.1.2",
+      "publishedAt": "2026-02-12T18:10:57.120Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fapp/7.1.2",
+        "https://www.npmjs.com/package/@capacitor/app/v/7.1.2",
+        "https://github.com/ionic-team/capacitor-plugins"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": ">=7.0.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": ">=7.0.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/network": {
+      "selectedVersion": "7.0.4",
+      "publishedAt": "2026-02-12T18:11:05.621Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fnetwork/7.0.4",
+        "https://www.npmjs.com/package/@capacitor/network/v/7.0.4",
+        "https://github.com/ionic-team/capacitor-plugins"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": ">=7.0.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": ">=7.0.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/preferences": {
+      "selectedVersion": "7.0.4",
+      "publishedAt": "2026-02-12T18:11:05.904Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fpreferences/7.0.4",
+        "https://www.npmjs.com/package/@capacitor/preferences/v/7.0.4",
+        "https://github.com/ionic-team/capacitor-plugins"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": ">=7.0.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": ">=7.0.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/screen-orientation": {
+      "selectedVersion": "7.0.4",
+      "publishedAt": "2026-02-12T18:11:08.280Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fscreen-orientation/7.0.4",
+        "https://www.npmjs.com/package/@capacitor/screen-orientation/v/7.0.4",
+        "https://github.com/ionic-team/capacitor-plugins"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": ">=7.0.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": ">=7.0.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/status-bar": {
+      "selectedVersion": "7.0.6",
+      "publishedAt": "2026-03-25T17:08:30.948Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fstatus-bar/7.0.6",
+        "https://www.npmjs.com/package/@capacitor/status-bar/v/7.0.6",
+        "https://github.com/ionic-team/capacitor-plugins"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": ">=7.0.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": ">=7.0.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/splash-screen": {
+      "selectedVersion": "7.0.5",
+      "publishedAt": "2026-02-12T18:11:11.319Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fsplash-screen/7.0.5",
+        "https://www.npmjs.com/package/@capacitor/splash-screen/v/7.0.5",
+        "https://github.com/ionic-team/capacitor-plugins"
+      ],
+      "engines": {},
+      "peerDependencies": {
+        "@capacitor/core": ">=7.0.0"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [
+          {
+            "relationship": "peerDependency",
+            "packageName": "@capacitor/core",
+            "range": ">=7.0.0",
+            "selectedVersion": "7.4.4",
+            "satisfied": true
+          }
+        ],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@capacitor/assets": {
+      "selectedVersion": "3.0.5",
+      "publishedAt": "2024-03-29T19:45:09.091Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40capacitor%2Fassets/3.0.5",
+        "https://www.npmjs.com/package/@capacitor/assets/v/3.0.5",
+        "https://github.com/ionic-team/capacitor-assets"
+      ],
+      "engines": {
+        "node": ">=10.3.0"
+      },
+      "peerDependencies": {},
+      "dependencies": {
+        "debug": "4.3.4",
+        "sharp": "0.32.6",
+        "tslib": "2.6.2",
+        "yargs": "17.7.2",
+        "fs-extra": "10.1.0",
+        "commander": "8.3.0",
+        "node-fetch": "2.7.0",
+        "@capacitor/cli": "^5.3.0",
+        "@ionic/utils-fs": "3.1.7",
+        "node-html-parser": "5.4.2",
+        "@ionic/utils-array": "2.1.6",
+        "@trapezedev/project": "^7.0.10"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": [
+          {
+            "packageName": "@capacitor/cli",
+            "range": "^5.3.0",
+            "resolution": "nested-package-dependency"
+          }
+        ]
+      }
+    },
+    "vitest": {
+      "selectedVersion": "4.1.11",
+      "publishedAt": "2026-08-18T14:27:07.240Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/vitest/4.1.11",
+        "https://www.npmjs.com/package/vitest/v/4.1.11",
+        "https://github.com/vitest-dev/vitest"
+      ],
+      "engines": {
+        "node": "^20.0.0 || ^22.0.0 || >=24.0.0"
+      },
+      "peerDependencies": {
+        "vite": "^6.0.0 || ^7.0.0 || ^8.0.0",
+        "jsdom": "*",
+        "happy-dom": "*",
+        "@vitest/ui": "4.1.11",
+        "@types/node": "^20.0.0 || ^22.0.0 || >=24.0.0",
+        "@edge-runtime/vm": "*",
+        "@opentelemetry/api": "^1.9.0",
+        "@vitest/coverage-v8": "4.1.11",
+        "@vitest/browser-preview": "4.1.11",
+        "@vitest/coverage-istanbul": "4.1.11",
+        "@vitest/browser-playwright": "4.1.11",
+        "@vitest/browser-webdriverio": "4.1.11"
+      },
+      "dependencies": {
+        "obug": "^2.1.1",
+        "vite": "^6.0.0 || ^7.0.0 || ^8.0.0",
+        "pathe": "^2.0.3",
+        "std-env": "^4.0.0-rc.1",
+        "tinyexec": "^1.0.2",
+        "picomatch": "^4.0.3",
+        "tinybench": "^2.9.0",
+        "tinyglobby": "^0.2.15",
+        "@vitest/spy": "4.1.11",
+        "expect-type": "^1.3.0",
+        "tinyrainbow": "^3.1.0",
+        "magic-string": "^0.30.21",
+        "@vitest/utils": "4.1.11",
+        "@vitest/expect": "4.1.11",
+        "@vitest/mocker": "4.1.11",
+        "@vitest/runner": "4.1.11",
+        "es-module-lexer": "^2.0.0",
+        "@vitest/snapshot": "4.1.11",
+        "why-is-node-running": "^2.3.0",
+        "@vitest/pretty-format": "4.1.11"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "fast-check": {
+      "selectedVersion": "4.9.0",
+      "publishedAt": "2026-07-08T21:33:03.026Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/fast-check/4.9.0",
+        "https://www.npmjs.com/package/fast-check/v/4.9.0",
+        "https://github.com/dubzzz/fast-check"
+      ],
+      "engines": {
+        "node": ">=12.17.0"
+      },
+      "peerDependencies": {},
+      "dependencies": {
+        "pure-rand": "^8.0.0"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "jsdom": {
+      "selectedVersion": "27.0.1",
+      "publishedAt": "2025-10-18T06:50:56.542Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/jsdom/27.0.1",
+        "https://www.npmjs.com/package/jsdom/v/27.0.1",
+        "https://github.com/jsdom/jsdom"
+      ],
+      "engines": {
+        "node": ">=20"
+      },
+      "peerDependencies": {
+        "canvas": "^3.0.0"
+      },
+      "dependencies": {
+        "ws": "^8.18.3",
+        "saxes": "^6.0.0",
+        "parse5": "^8.0.0",
+        "cssstyle": "^5.3.1",
+        "data-urls": "^6.0.0",
+        "decimal.js": "^10.6.0",
+        "whatwg-url": "^15.1.0",
+        "rrweb-cssom": "^0.8.0",
+        "symbol-tree": "^3.2.4",
+        "tough-cookie": "^6.0.0",
+        "whatwg-encoding": "^3.1.1",
+        "whatwg-mimetype": "^4.0.0",
+        "http-proxy-agent": "^7.0.2",
+        "https-proxy-agent": "^7.0.6",
+        "w3c-xmlserializer": "^5.0.0",
+        "webidl-conversions": "^8.0.0",
+        "xml-name-validator": "^5.0.0",
+        "html-encoding-sniffer": "^4.0.0",
+        "@asamuzakjp/dom-selector": "^6.7.2",
+        "is-potential-custom-element-name": "^1.0.1"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@testing-library/react": {
+      "selectedVersion": "16.3.3",
+      "publishedAt": "2026-08-27T17:41:18.735Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40testing-library%2Freact/16.3.3",
+        "https://www.npmjs.com/package/@testing-library/react/v/16.3.3",
+        "https://github.com/testing-library/react-testing-library"
+      ],
+      "engines": {
+        "node": ">=18"
+      },
+      "peerDependencies": {
+        "react": "^18.0.0 || ^19.0.0",
+        "react-dom": "^18.0.0 || ^19.0.0",
+        "@types/react": "^18.0.0 || ^19.0.0",
+        "@types/react-dom": "^18.0.0 || ^19.0.0",
+        "@testing-library/dom": "^10.0.0"
+      },
+      "dependencies": {
+        "@babel/runtime": "^7.12.5"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@testing-library/user-event": {
+      "selectedVersion": "14.6.7",
+      "publishedAt": "2026-09-02T01:56:32.109Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40testing-library%2Fuser-event/14.6.7",
+        "https://www.npmjs.com/package/@testing-library/user-event/v/14.6.7",
+        "https://github.com/testing-library/user-event"
+      ],
+      "engines": {
+        "npm": ">=6",
+        "node": ">=12"
+      },
+      "peerDependencies": {
+        "@testing-library/dom": ">=7.21.4"
+      },
+      "dependencies": {},
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    },
+    "@playwright/test": {
+      "selectedVersion": "1.63.0",
+      "publishedAt": "2026-09-04T22:44:00.304Z",
+      "sourceUrls": [
+        "https://registry.npmjs.org/%40playwright%2Ftest/1.63.0",
+        "https://www.npmjs.com/package/@playwright/test/v/1.63.0",
+        "https://github.com/microsoft/playwright"
+      ],
+      "engines": {
+        "node": ">=20"
+      },
+      "peerDependencies": {},
+      "dependencies": {
+        "playwright": "1.63.0"
+      },
+      "compatibility": {
+        "nodeFloorAccepted": true,
+        "capacitorContracts": [],
+        "bundledCapacitorDependencies": []
+      }
+    }
+  },
+  "secureStorage": {
+    "packageName": "@aparajita/capacitor-secure-storage",
+    "selectedVersion": "7.1.6",
+    "capacitorCompatibility": {
+      "capacitorVersion": "7.4.4",
+      "sourceUrl": "https://registry.npmjs.org/%40aparajita%2Fcapacitor-secure-storage/7.1.6",
+      "contracts": [
+        {
+          "relationship": "dependency",
+          "packageName": "@capacitor/app",
+          "range": "^7.1.0",
+          "selectedVersion": "7.1.2",
+          "satisfied": true
+        },
+        {
+          "relationship": "dependency",
+          "packageName": "@capacitor/ios",
+          "range": "^7.4.4",
+          "selectedVersion": "7.4.4",
+          "satisfied": true
+        },
+        {
+          "relationship": "dependency",
+          "packageName": "@capacitor/core",
+          "range": "^7.4.4",
+          "selectedVersion": "7.4.4",
+          "satisfied": true
+        },
+        {
+          "relationship": "dependency",
+          "packageName": "@capacitor/android",
+          "range": "^7.4.4",
+          "selectedVersion": "7.4.4",
+          "satisfied": true
+        }
+      ]
+    },
+    "latestQualifyingUpstreamActivity": {
+      "type": "commit",
+      "ref": "43bc5c36cf80bc575b22b4ce849228f591b1b33b",
+      "occurredAt": "2026-02-12T18:22:28Z",
+      "sourceUrl": "https://github.com/aparajita/capacitor-secure-storage/commit/43bc5c36cf80bc575b22b4ce849228f591b1b33b"
+    }
+  }
+}

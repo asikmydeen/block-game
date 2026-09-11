@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
+import { groundYUnder, FLOOR_TOP_Y } from '../game/ground';
 import { HOUSES } from '../game/houses';
 import { Humanoid, createLimbs, type HumanoidLimbs } from './Humanoid';
 
@@ -19,7 +20,6 @@ interface VillagerData {
   homeZ: number;
 }
 
-const FLOOR_TOP_Y = 12;
 
 const SHIRT_COLORS = ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400', '#16a085', '#e67e22'];
 const PANTS_COLORS = ['#34495e', '#2c3e50', '#7f5539', '#5d4037', '#3e2723'];
@@ -30,15 +30,8 @@ function pick<T>(arr: T[], i: number): T {
   return arr[i % arr.length];
 }
 
-function findGroundY(world: WorldState, x: number, z: number): number {
-  const ix = Math.floor(x);
-  const iz = Math.floor(z);
-  for (let y = 30; y >= 0; y--) {
-    const b = world.getBlock(ix, y, iz);
-    if (b && b !== 'air' && b !== 'water') return y + 1;
-  }
-  return FLOOR_TOP_Y + 1;
-}
+const findGroundY = (world: WorldState, x: number, z: number, currentY: number) =>
+  groundYUnder(world, x, z, currentY);
 
 function isSolid(world: WorldState, x: number, y: number, z: number): boolean {
   const b = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
@@ -119,7 +112,7 @@ export function Villagers({ world }: VillagersProps) {
         }
       }
 
-      v.pos.y = findGroundY(world, v.pos.x, v.pos.z);
+      v.pos.y = findGroundY(world, v.pos.x, v.pos.z, v.pos.y);
 
       v.breakTimer -= dt;
       if (v.breakTimer <= 0) {

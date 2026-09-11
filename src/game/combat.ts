@@ -51,3 +51,98 @@ export const combatRegistry: {
   hitZombies: null,
   onZombieKilled: null,
 };
+
+// ── Shared primary-fire cadence controller ─────────────────────────────────
+//
+// Both touch (held ATK button) and desktop (held left mouse / configured key)
+// dispatch the SAME named "primary" command through one controller so weapon
+// timing cannot diverge by input device (Requirement 7.13, 9.11). It is a pure
+// state machine driven by an injected clock: `step(nowMs, held)` returns how
+// many shots should fire on that frame.
+//
+//  - Rising edge (not held -> held) always fires one shot if the cooldown is
+//    clear, for every weapon.
+//  - Automatic weapons (`auto: true`) keep firing at `attackRate` shots/second
+//    while held.
+//  - Semi-auto weapons fire once per press and require a release before the
+//    next shot.
+//  - Any terminal — release, cancel, background, typing gate, or a closed input
+//    gate — stops fire immediately even while the button is logically held, and
+//    re-arms the rising edge so the next genuine press after the terminal fires
+//    again.
+
+export interface PrimaryFireController {
+  setWeapon(w: WeaponSpec): void;
+  step(nowMs: number, held: boolean): number;
+  cancel(): void;
+  setBackgrounded(bg: boolean): void;
+  setTyping(typing: boolean): void;
+  setInputOpen(open: boolean): void;
+}
+
+export function createPrimaryFireController(): PrimaryFireController {
+  let weapon: WeaponSpec = WEAPONS[0];
+  let wasHeld = false;
+  let lastShot = -Infinity;
+  let backgrounded = false;
+  let typing = false;
+  let inputOpen = true;
+  let cancelled = false;
+
+  function blocked(): boolean {
+    return backgrounded || typing || !inputOpen || cancelled;
+  }
+
+  return {
+    setWeapon(w) {
+      weapon = w;
+    },
+    step(nowMs, held) {
+      if (!held) {
+        // Physical release clears a latched cancel and re-arms the edge.
+        wasHeld = false;
+        cancelled = false;
+        return 0;
+      }
+      // A terminal condition forces neutral: no fire while it holds, and the
+      // next press after it clears is a fresh rising edge.
+      if (blocked()) {
+        wasHeld = false;
+        return 0;
+      }
+      const interval = 1000 / weapon.attackRate;
+      const rising = !wasHeld;
+      wasHeld = true;
+      if (rising) {
+        // Fire on the edge if the cooldown from the previous shot has elapsed.
+        if (nowMs - lastShot >= interval) {
+          lastShot = nowMs;
+          return 1;
+        }
+        return 0;
+      }
+      // Held: only automatic weapons repeat, and only at cadence.
+      if (weapon.auto && nowMs - lastShot >= interval) {
+        lastShot = nowMs;
+        return 1;
+      }
+      return 0;
+    },
+    cancel() {
+      wasHeld = false;
+      cancelled = true;
+    },
+    setBackgrounded(bg) {
+      backgrounded = bg;
+      if (bg) wasHeld = false;
+    },
+    setTyping(t) {
+      typing = t;
+      if (t) wasHeld = false;
+    },
+    setInputOpen(open) {
+      inputOpen = open;
+      if (!open) wasHeld = false;
+    },
+  };
+}

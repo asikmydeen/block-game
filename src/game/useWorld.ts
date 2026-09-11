@@ -1,8 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { BlockType, generateChunk } from './terrain';
+import {
+  createWorldChunkManager,
+  WorldChunkManager,
+  ACTIVE_RADIUS,
+} from './worldChunkManager';
 
 const CHUNK_SIZE = 16;
-const RENDER_DISTANCE = 3;
 const SEED = Math.floor(Math.random() * 10000);
 
 export interface BlockUpdate {
@@ -13,111 +17,92 @@ export interface BlockUpdate {
 }
 
 export interface WorldState {
+  /** Only the active (7x7) window — the set World.tsx renders. */
   chunks: Map<string, Map<string, BlockType>>;
   getBlock: (wx: number, wy: number, wz: number) => BlockType | undefined;
   setBlock: (wx: number, wy: number, wz: number, type: BlockType) => void;
   setBlocks: (updates: BlockUpdate[]) => void;
   loadChunksAround: (wx: number, wz: number) => void;
+  /** Underlying bounded store (mesh revisions, disposal, active/retained). */
+  manager: WorldChunkManager;
+  /** Per-chunk mesh revision, for keyed geometry invalidation. */
+  getRevision: (cx: number, cz: number) => number;
 }
 
-function worldToChunk(wx: number, wz: number): [number, number] {
-  return [Math.floor(wx / CHUNK_SIZE), Math.floor(wz / CHUNK_SIZE)];
-}
-
-function worldToLocal(wx: number, wy: number, wz: number): [number, number, number, number, number] {
-  const cx = Math.floor(wx / CHUNK_SIZE);
-  const cz = Math.floor(wz / CHUNK_SIZE);
-  let lx = wx - cx * CHUNK_SIZE;
-  let lz = wz - cz * CHUNK_SIZE;
-  if (lx < 0) lx += CHUNK_SIZE;
-  if (lz < 0) lz += CHUNK_SIZE;
-  return [cx, cz, lx, wy, lz];
-}
-
-function createInitialChunks(): Map<string, Map<string, BlockType>> {
-  const map = new Map<string, Map<string, BlockType>>();
-  for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-    for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-      map.set(`${dx},${dz}`, generateChunk(dx, dz, SEED));
-    }
+/** Build the active-window chunk map (only what World renders). */
+function activeChunkMap(manager: WorldChunkManager): Map<string, Map<string, BlockType>> {
+  const out = new Map<string, Map<string, BlockType>>();
+  for (const key of manager.getActiveKeys()) {
+    const [cx, cz] = key.split(',').map(Number);
+    const chunk = manager.getChunk(cx, cz);
+    if (chunk) out.set(key, chunk);
   }
-  return map;
+  return out;
 }
 
 export function useWorld(): WorldState {
-  const chunksRef = useRef<Map<string, Map<string, BlockType>>>(createInitialChunks());
+  const managerRef = useRef<WorldChunkManager | null>(null);
+  if (!managerRef.current) {
+    const m = createWorldChunkManager({ seed: SEED, generate: generateChunk });
+    // Spawn window centered on origin, matching the previous initial 7x7 load.
+    m.recenter(0, 0);
+    managerRef.current = m;
+  }
+  const manager = managerRef.current;
+
   const [, forceUpdate] = useState(0);
+  const rerender = useCallback(() => forceUpdate(n => n + 1), []);
 
-  const ensureChunk = useCallback((cx: number, cz: number) => {
-    const key = `${cx},${cz}`;
-    if (!chunksRef.current.has(key)) {
-      const chunk = generateChunk(cx, cz, SEED);
-      chunksRef.current.set(key, chunk);
-    }
-  }, []);
+  // React re-renders only when membership actually changes (frame-level
+  // same-chunk movement publishes nothing, so it never reaches React).
+  useEffect(() => {
+    const unsub = manager.subscribe(rerender);
+    return () => {
+      unsub();
+      manager.dispose();
+    };
+  }, [manager, rerender]);
 
-  const getBlock = useCallback((wx: number, wy: number, wz: number): BlockType | undefined => {
-    const [cx, cz, lx, ly, lz] = worldToLocal(wx, wy, wz);
-    const chunkKey = `${cx},${cz}`;
-    const chunk = chunksRef.current.get(chunkKey);
-    if (!chunk) return undefined;
-    return chunk.get(`${lx},${ly},${lz}`);
-  }, []);
+  const getBlock = useCallback(
+    (wx: number, wy: number, wz: number) => manager.getBlock(wx, wy, wz),
+    [manager],
+  );
 
-  const setBlock = useCallback((wx: number, wy: number, wz: number, type: BlockType) => {
-    const [cx, cz, lx, ly, lz] = worldToLocal(wx, wy, wz);
-    const chunkKey = `${cx},${cz}`;
-    const existing = chunksRef.current.get(chunkKey) ?? generateChunk(cx, cz, SEED);
-    const nextChunk = new Map(existing);
-    nextChunk.set(`${lx},${ly},${lz}`, type);
-    chunksRef.current.set(chunkKey, nextChunk);
-    forceUpdate(n => n + 1);
-  }, []);
+  const setBlock = useCallback(
+    (wx: number, wy: number, wz: number, type: BlockType) => {
+      manager.setBlock(wx, wy, wz, type);
+    },
+    [manager],
+  );
 
-  const setBlocks = useCallback((updates: BlockUpdate[]) => {
-    if (updates.length === 0) return;
-    const cloned = new Map<string, Map<string, BlockType>>();
-    for (const u of updates) {
-      const [cx, cz, lx, ly, lz] = worldToLocal(u.wx, u.wy, u.wz);
-      const chunkKey = `${cx},${cz}`;
-      let nc = cloned.get(chunkKey);
-      if (!nc) {
-        const existing = chunksRef.current.get(chunkKey) ?? generateChunk(cx, cz, SEED);
-        nc = new Map(existing);
-        cloned.set(chunkKey, nc);
-      }
-      nc.set(`${lx},${ly},${lz}`, u.type);
-    }
-    for (const [ck, nc] of cloned) {
-      chunksRef.current.set(ck, nc);
-    }
-    forceUpdate(n => n + 1);
-  }, []);
+  const setBlocks = useCallback(
+    (updates: BlockUpdate[]) => {
+      manager.setBlocks(updates);
+    },
+    [manager],
+  );
 
-  const loadChunksAround = useCallback((wx: number, wz: number) => {
-    const [pcx, pcz] = worldToChunk(Math.floor(wx), Math.floor(wz));
-    let loaded = false;
-    for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-      for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-        const cx = pcx + dx;
-        const cz = pcz + dz;
-        const key = `${cx},${cz}`;
-        if (!chunksRef.current.has(key)) {
-          ensureChunk(cx, cz);
-          loaded = true;
-        }
-      }
-    }
-    if (loaded) {
-      forceUpdate(n => n + 1);
-    }
-  }, [ensureChunk]);
+  const loadChunksAround = useCallback(
+    (wx: number, wz: number) => {
+      manager.recenterWorld(wx, wz);
+    },
+    [manager],
+  );
+
+  const getRevision = useCallback(
+    (cx: number, cz: number) => manager.getRevision(cx, cz),
+    [manager],
+  );
 
   return {
-    chunks: chunksRef.current,
+    chunks: activeChunkMap(manager),
     getBlock,
     setBlock,
     setBlocks,
     loadChunksAround,
+    manager,
+    getRevision,
   };
 }
+
+export { CHUNK_SIZE, ACTIVE_RADIUS };

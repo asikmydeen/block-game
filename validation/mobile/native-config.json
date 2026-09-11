@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "description": "Native OS floors, orientation, plugin, privacy, and signing metadata that Capacitor's shared config cannot express. Applied to the generated ios/App and android projects; read by scripts/native/validate-projects.mjs. No secrets are tracked here.",
+  "appId": "com.asikmydeen.craftworld",
+  "appName": "Craftworld",
+  "webDir": "dist/public",
+  "ios": {
+    "deploymentTarget": "17.0",
+    "orientations": ["landscape-left", "landscape-right"],
+    "infoPlist": {
+      "UISupportedInterfaceOrientations": [
+        "UIInterfaceOrientationLandscapeLeft",
+        "UIInterfaceOrientationLandscapeRight"
+      ],
+      "UISupportedInterfaceOrientations~ipad": [
+        "UIInterfaceOrientationLandscapeLeft",
+        "UIInterfaceOrientationLandscapeRight"
+      ]
+    }
+  },
+  "android": {
+    "minSdk": 31,
+    "compileSdk": 35,
+    "targetSdk": 35,
+    "orientations": ["landscape-left", "landscape-right"],
+    "screenOrientation": "sensorLandscape",
+    "windowSoftInputMode": "adjustResize"
+  },
+  "plugins": {
+    "App": {
+      "notes": "Foreground/background + resume lifecycle events; state changes are de-duplicated in runtimeEvents native adapter."
+    },
+    "Network": {
+      "notes": "Connectivity change listener attached early in bootstrap."
+    },
+    "Preferences": {
+      "notes": "Non-secret device-id and lightweight settings storage.",
+      "group": "CraftworldPrefs"
+    },
+    "SecureStorage": {
+      "notes": "Auth token storage backed by iOS Keychain / Android Keystore.",
+      "icloudSync": false
+    },
+    "ScreenOrientation": {
+      "notes": "Locks to landscape during shell.prepare() before input is enabled.",
+      "lock": "landscape"
+    },
+    "StatusBar": {
+      "notes": "Hidden during shell.prepare() before input is enabled.",
+      "style": "dark",
+      "overlaysWebView": false
+    },
+    "SplashScreen": {
+      "notes": "launchAutoHide is false; the app hides the splash once after readiness.",
+      "launchAutoHide": false
+    }
+  },
+  "privacy": {
+    "iosPrivacyManifest": "ios/App/App/PrivacyInfo.xcprivacy",
+    "androidDataSafety": "docs/mobile/android-data-safety.md",
+    "dataCategories": [
+      {
+        "category": "account",
+        "collected": true,
+        "linkedToUser": true,
+        "purpose": "app-functionality",
+        "notes": "Username and best-score progress persisted to the game backend."
+      },
+      {
+        "category": "identifiers",
+        "collected": true,
+        "linkedToUser": true,
+        "purpose": "app-functionality",
+        "notes": "An app-generated device id kept in Preferences; not an ad identifier."
+      }
+    ],
+    "requiredReasonApis": [
+      {
+        "api": "NSPrivacyAccessedAPICategoryUserDefaults",
+        "reason": "CA92.1"
+      }
+    ]
+  },
+  "signing": {
+    "mode": "placeholder",
+    "notes": "No signing material is tracked. Release signing is supplied at build time from environment/CI only.",
+    "ios": {
+      "developmentTeam": "PLACEHOLDER_TEAM_ID",
+      "codeSignStyle": "Manual",
+      "provisioningProfile": "PLACEHOLDER_PROFILE"
+    },
+    "android": {
+      "keystore": "PLACEHOLDER_env:ANDROID_KEYSTORE_PATH",
+      "keyAlias": "PLACEHOLDER_env:ANDROID_KEY_ALIAS"
+    }
+  }
+}

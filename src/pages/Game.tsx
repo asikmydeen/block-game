@@ -1,6 +1,8 @@
-import { useState, useCallback, useEffect, useMemo, useRef, Suspense, type MutableRefObject } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense, Profiler, type MutableRefObject } from 'react';
+import { isCommitProbeEnabled, recordCommit } from '../game/commitProbe';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Sky, Stars } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useWorld } from '../game/useWorld';
 import { World } from '../components/World';
@@ -21,10 +23,16 @@ import { TrafficLights } from '../components/TrafficLights';
 import { generateRoadUpdates } from '../game/roads';
 import { generateForestUpdates, generateParkUpdates } from '../game/decorations';
 import { StreetLamps } from '../components/StreetLamps';
+import { selectRenderProfile, type RenderProfile } from '../game/renderQuality';
+import { createHudSampler, type HudSampler } from '../game/hudSampler';
 import { Animals } from '../components/Animals';
 import { animalsRegistry, ridingState, type RideableKind } from '../game/animals';
-import { getToken, saveProgress, type Account } from '../game/account';
-import { CAR_SPECS, type CarInfo, carsRegistry, drivingState } from '../game/cars';
+import { getAccountApiClient, getToken, saveProgress, type Account } from '../game/account';
+import { getEndpointConfig } from '../game/apiClient';
+import { EMOTES, reportKill, sendEmote, createStoreSink } from '../game/multiplayer';
+import { createMultiplayerClient, type MultiplayerClient } from '../game/multiplayerClient';
+import { ChatPanel, EmoteBar, EventFeed, PlayersPanel } from '../components/SocialUI';
+import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
 import { powerState } from '../game/powers';
 import { RemotePlayers } from '../components/RemotePlayers';
 import {
@@ -91,6 +99,7 @@ function GameScene({
   waypoints,
   planId,
   namedBuildings,
+  profile,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
@@ -113,6 +122,7 @@ function GameScene({
   waypoints?: Array<{ x: number; y: number; z: number; label: string; color?: string }>;
   planId?: PlanId | null;
   namedBuildings?: NamedBuilding[];
+  profile: RenderProfile;
 }) {
   const bgColor = night ? '#0a1024' : '#87CEEB';
   const fogArgs: [string, number, number] = night
@@ -124,12 +134,15 @@ function GameScene({
       <color attach="background" args={[bgColor]} />
       <fog attach="fog" args={fogArgs} />
 
-      <ambientLight intensity={night ? 0.12 : 0.4} />
+      {/* Ambient is deliberately low: the chunk mesher bakes ambient occlusion
+          into vertex colours, so flooding the scene with fill light would wash
+          that contact shading straight out. */}
+      <ambientLight intensity={night ? 0.1 : 0.34} />
       {/* Sun by day, moonlight by night */}
       <directionalLight
         position={[100, 150, 100]}
-        intensity={night ? 0.18 : 1.2}
-        color={night ? '#8fb0ff' : '#ffffff'}
+        intensity={night ? 0.18 : 1.35}
+        color={night ? '#8fb0ff' : '#fff6e6'}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-far={300}
@@ -137,6 +150,10 @@ function GameScene({
         shadow-camera-right={80}
         shadow-camera-top={80}
         shadow-camera-bottom={-80}
+        // Bias pair kills shadow acne on flat voxel faces without introducing
+        // visible peter-panning.
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
       />
       <hemisphereLight
         color={night ? '#1a2340' : '#87CEEB'}
@@ -151,11 +168,30 @@ function GameScene({
           <meshBasicMaterial color="#e8ecf4" />
         </mesh>
       )}
-      <Stars radius={300} depth={50} count={3000} factor={4} />
+      <Stars radius={300} depth={50} count={profile.starCount} factor={4} />
 
-      <World world={world} />
+      <World world={world} night={night} />
+
+      {/* Bloom makes the street lamps, neon and sun glints actually glow;
+          it is dialled up at night where the light sources carry the scene.
+          On mobile the profile scales the intensity down (or disables it). */}
+      {profile.bloomEnabled ? (
+        <EffectComposer enableNormalPass={false}>
+          <Bloom
+            intensity={(night ? 1.15 : 0.32) * profile.bloomIntensityScale}
+            luminanceThreshold={night ? 0.28 : 0.72}
+            luminanceSmoothing={0.22}
+            mipmapBlur
+          />
+          <Vignette offset={0.28} darkness={night ? 0.62 : 0.32} />
+        </EffectComposer>
+      ) : (
+        <EffectComposer enableNormalPass={false}>
+          <Vignette offset={0.28} darkness={night ? 0.62 : 0.32} />
+        </EffectComposer>
+      )}
       <TrafficLights />
-      <StreetLamps night={night} />
+      <StreetLamps night={night} lightLimit={profile.decorativeLightLimit} playerPosRef={playerPosRef} />
       <Animals
         world={world}
         playerPosRef={playerPosRef}
@@ -270,6 +306,9 @@ export default function Game({
   const [deathCount, setDeathCount] = useState(() => account.deaths ?? 0);
   const [shopOpen, setShopOpen] = useState(false);
   const [night, setNight] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const chatOpenRef = useRef(false);
   const scoreRef = useRef(0);
   const ownedRef = useRef<ReadonlySet<WeaponType>>(new Set());
   const shopOpenRef = useRef(false);
@@ -278,6 +317,66 @@ export default function Game({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const healthRef = useRef(10);
   const aliveRef = useRef(true);
+  // Camera-facing yaw for the position publisher. RemotePlayers updates it each
+  // frame (it has the camera); the transport client reads it. It is a plain
+  // ref, not transport state.
+  const mpYawRef = useRef(0);
+
+  // The render profile is selected ONCE, before the Canvas is created, from an
+  // injected capability snapshot. It is immutable for the session and feeds the
+  // renderer (gl/dpr/shadows/tone mapping), star count, bloom, and the
+  // decorative-light budget. Never rebuilt — quality does not change mid-session.
+  const profile = useMemo(() => selectRenderProfile({ isNative: isTouchDevice() }), []);
+
+  // Test-only: whether to instrument the root game commit rate (task 14.7).
+  // Off in every normal session; a Playwright spec opts in before the app boots.
+  const commitProbe = useMemo(() => isCommitProbeEnabled(), []);
+
+  // The HUD position sampler is the ONLY path from the per-frame position into
+  // React. Player writes continuous position into playerPosRef every frame and
+  // calls handlePositionChange; the sampler forwards rounded coordinates to the
+  // HUD at <= 5 Hz with equality suppression, replacing the old per-frame
+  // setPlayerPos commit. Discrete UI events stay immediate.
+  const hudSamplerRef = useRef<HudSampler | null>(null);
+  if (!hudSamplerRef.current) {
+    hudSamplerRef.current = createHudSampler({
+      precision: 1,
+      publish: (c) => setPlayerPos(new THREE.Vector3(c.x, c.y, c.z)),
+    });
+  }
+
+  // The multiplayer transport, created ONCE and owned here (not by any R3F
+  // component). It reads the live position/score/yaw through refs and pushes
+  // decoded protocol events into the shared store via the sink adapter, which
+  // preserves every existing message shape and store mutation. RemotePlayers
+  // merely starts/stops it.
+  const mpClientRef = useRef<MultiplayerClient | null>(null);
+  if (mode === 'multi' && !mpClientRef.current) {
+    mpClientRef.current = createMultiplayerClient({
+      url: getEndpointConfig().webSocketUrl.toString(),
+      socketFactory: (url) => new WebSocket(url),
+      getToken: () => getToken(),
+      clearAuth: () => {
+        // A server auth rejection is terminal; surface it and stop dialing.
+        setMpStatus({ status: 'offline', count: 0 });
+      },
+      getPosition: () => {
+        const p = playerPosRef.current;
+        return { x: p.x, y: p.y, z: p.z, yaw: mpYawRef.current, score: scoreRef.current };
+      },
+      sink: createStoreSink({
+        self: () => {},
+        status: (status, count) => setMpStatus({ status, count }),
+        race: (r) => setRace(r as RaceState),
+        ping: (ev) => {
+          const e = ev as PingEvent;
+          setPingMark({ ...e, until: Date.now() + 8000 });
+          showToastRef.current?.(`${e.from} pinged a location`);
+        },
+        players: (list) => setMpPlayers(list as MpPlayerInfo[]),
+      }),
+    });
+  }
 
   useEffect(() => {
     world.setBlocks([
@@ -308,6 +407,19 @@ export default function Game({
   useEffect(() => {
     shopOpenRef.current = shopOpen;
   }, [shopOpen]);
+
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+  }, [chatOpen]);
+
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
+
+  const isMulti = mode === 'multi';
+  // The keydown effect registers once, so it reads the mode through a ref.
+  const isMultiRef = useRef(isMulti);
+  isMultiRef.current = isMulti;
 
   // ── Progress autosave ───────────────────────────────────────────────────
   // Debounced so a fast kill streak doesn't spam the API. The server keeps
@@ -350,28 +462,38 @@ export default function Game({
     const flush = () => {
       const p = progressRef.current;
       const token = getToken();
-      if (!token || !navigator.sendBeacon) return;
-      navigator.sendBeacon(
-        '/api/profile/progress',
-        new Blob(
-          [
-            JSON.stringify({
-              score: p.score,
-              zombieKills: p.zombieKills,
-              deaths: p.deathCount,
-              ownedWeapons: [...p.ownedWeapons],
-              missionsCompleted: [...p.completedMissions],
-              token,
-            }),
-          ],
-          { type: 'application/json' }
-        )
-      );
+      if (!token) return;
+      // Absolute-URL beacon through the resolved API base. The server still
+      // accepts the token in the body for this final web save; the client
+      // never places it in the URL.
+      getAccountApiClient().beacon('/api/profile/progress', {
+        score: p.score,
+        zombieKills: p.zombieKills,
+        deaths: p.deathCount,
+        ownedWeapons: [...p.ownedWeapons],
+        missionsCompleted: [...p.completedMissions],
+        token,
+      });
     };
     window.addEventListener('pagehide', flush);
     return () => {
       window.removeEventListener('pagehide', flush);
       flush();
+    };
+  }, []);
+
+  // Suspend HUD sampling while backgrounded; resume when foregrounded. This
+  // keeps the sampler from publishing stale positions during a tab/app hide and
+  // matches the lifecycle suspend ordering used elsewhere.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) hudSamplerRef.current?.suspend();
+      else hudSamplerRef.current?.resume();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      hudSamplerRef.current?.stop();
     };
   }, []);
 
@@ -386,6 +508,8 @@ export default function Game({
         setMissionCount(c => c + 1);
       }
       // timed kill-levels increment above; MP race completion is sent when the count hits the goal
+      // Cosmetic kill feed for anyone else in the world.
+      if (isMultiRef.current) reportKill();
     };
     return () => {
       combatRegistry.onZombieKilled = null;
@@ -562,6 +686,9 @@ export default function Game({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // While the chat box has focus, every keystroke belongs to the message.
+      if (chatOpenRef.current) return;
+
       if (e.key === 'Escape') {
         if (shopOpenRef.current) {
           setShopOpen(false);
@@ -578,6 +705,28 @@ export default function Game({
         return;
       }
       if (pausedRef.current) return;
+
+      // ── Multiplayer social bindings ───────────────────────────────────
+      if (isMultiRef.current) {
+        if (e.key === 't' || e.key === 'T') {
+          if (e.repeat) return;
+          if (document.pointerLockElement) document.exitPointerLock();
+          setChatOpen(true);
+          return;
+        }
+        if (e.key === 'p' || e.key === 'P') {
+          if (e.repeat) return;
+          setPlayersOpen(o => !o);
+          return;
+        }
+        const emote = EMOTES.find(em => em.key.toLowerCase() === e.key.toLowerCase());
+        if (emote) {
+          if (e.repeat) return;
+          sendEmote(emote.name);
+          return;
+        }
+      }
+
       if (e.key === 'b' || e.key === 'B') {
         if (e.repeat) return;
         setShopOpen(open => {
@@ -823,7 +972,10 @@ export default function Game({
   }, [world, showToast]);
 
   const handlePositionChange = useCallback((pos: THREE.Vector3) => {
-    setPlayerPos(pos.clone());
+    // Per-frame path: continuous position already lives in playerPosRef (Player
+    // copies into it each frame). Do NOT setState here — feed the sampler, which
+    // publishes to the HUD at most 5x/sec with display-precision suppression.
+    hudSamplerRef.current?.sample(performance.now(), { x: pos.x, y: pos.y, z: pos.z });
   }, []);
 
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
@@ -831,7 +983,15 @@ export default function Game({
       setWebglError(true);
     }
     canvasElRef.current = gl.domElement;
-  }, []);
+    // Filmic tone mapping keeps bright sky and lamp glare from clipping to
+    // flat white, and soft shadows suit the chunky geometry. Both tiers keep
+    // ACES tone mapping (meshes/glow stay visible); only the shadow map type
+    // and enablement follow the profile.
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = profile.toneMappingExposure;
+    gl.shadowMap.type =
+      profile.shadowMapType === 'pcfsoft' ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
+  }, [profile]);
 
   const handleStart = useCallback(() => {
     setStarted(true);
@@ -901,12 +1061,12 @@ export default function Game({
   );
 
   const nearbyPlayers = useMemo(() => {
-    const p = playerPos;
+    const p = playerPosRef.current;
     return mpPlayers.map((o) => ({
       name: o.name,
       dist: Math.hypot(o.x - p.x, o.y - p.y, o.z - p.z),
     }));
-  }, [mpPlayers, playerPos]);
+  }, [mpPlayers]);
 
   const handlePing = useCallback(() => {
     const p = playerPosRef.current;
@@ -972,17 +1132,26 @@ export default function Game({
     );
   }
 
-  return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative', background: '#87CEEB' }}>
+  const gameTree = (
+    <div
+      data-testid="game-root"
+      style={{ width: '100vw', height: '100vh', position: 'relative', background: '#87CEEB' }}
+    >
       <KeyboardControls map={keyMap}>
+        {/* The root-commit-rate gate (task 14.7, <=10 root game commits/sec
+            during steady movement) is exercised by the Playwright e2e suite in
+            tests/e2e/, which wraps this tree in a React Profiler via the
+            test-only commit probe below. The HUD sampler unit/property tests
+            (Properties 15/16) remain the deterministic in-process coverage. */}
         <Canvas
           gl={{
-            antialias: true,
+            antialias: profile.antialias,
             failIfMajorPerformanceCaveat: false,
           }}
+          dpr={profile.dpr ?? undefined}
           onCreated={handleCreated}
           camera={{ fov: 75, near: 0.05, far: 500, position: [8, 18, 8] }}
-          shadows
+          shadows={profile.shadows}
           style={{ position: 'absolute', inset: 0 }}
         >
           <Suspense fallback={null}>
@@ -1008,18 +1177,10 @@ export default function Game({
               waypoints={waypoints}
               planId={playStance === 'build' ? selectedPlan : null}
               namedBuildings={namedBuildings}
+              profile={profile}
             />
-            {mode === 'multi' && (
-              <RemotePlayers
-                playerPosRef={playerPosRef}
-                onStatusChange={(status, count) => setMpStatus({ status, count })}
-                onRace={setRace}
-                onPlayers={setMpPlayers}
-                onPing={(ev: PingEvent) => {
-                  setPingMark({ ...ev, until: Date.now() + 8000 });
-                  showToastRef.current?.(`${ev.from} pinged a location`);
-                }}
-              />
+            {mode === 'multi' && mpClientRef.current && (
+              <RemotePlayers client={mpClientRef.current} yawRef={mpYawRef} />
             )}
           </Suspense>
         </Canvas>
@@ -1102,6 +1263,15 @@ export default function Game({
         stance={playStance}
         driving={!!carInfo}
       />
+
+      {isMulti && (
+        <>
+          <EventFeed />
+          <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} myUsername={account.username} />
+          <PlayersPanel open={playersOpen} myUsername={account.username} myScore={score} />
+          {started && !showDeath && <EmoteBar touchMode={touchMode} />}
+        </>
+      )}
 
       {shopOpen && (
         <div
@@ -1321,4 +1491,13 @@ export default function Game({
       )}
     </div>
   );
+
+  if (commitProbe) {
+    return (
+      <Profiler id="game-root" onRender={recordCommit}>
+        {gameTree}
+      </Profiler>
+    );
+  }
+  return gameTree;
 }

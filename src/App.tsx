@@ -45,12 +45,21 @@ const MODES: ModeCard[] = [
   },
 ];
 
-function App() {
+function App({ onReady }: { onReady?: () => void } = {}) {
   const [account, setAccount] = useState<Account | null>(null);
   const [booting, setBooting] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [mode, setMode] = useState<GameMode | null>(null);
   const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
+
+  // Signal root-shell readiness exactly once after the first commit so the
+  // native bootstrap can dismiss the launch splash after a settled frame. On
+  // web this is a harmless no-op callback.
+  useEffect(() => {
+    onReady?.();
+    // Intentionally run once on mount; onReady is a stable bootstrap callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Same computer -> same account: try a silent resume before prompting.
   useEffect(() => {
