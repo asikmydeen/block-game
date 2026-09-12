@@ -237,13 +237,42 @@ export function validateAssetMasters(fileExists, diagnostics) {
  * `skipped-toolchain-absent` (never a hard failure) so the host-checkable
  * contract can still pass on a CLT-only / no-Android-SDK machine.
  */
-export function validateGeneratedProjects(fileExists, diagnostics, { toolchainAvailable = false } = {}) {
+export function validateGeneratedProjects(fileExists, diagnostics, { toolchainAvailable = false, readGenerated = () => null } = {}) {
   const iosPresent = fileExists('ios/App');
   const androidPresent = fileExists('android');
 
   if (iosPresent) {
     if (!fileExists('ios/App/App.xcodeproj') && !fileExists('ios/App/App.xcworkspace')) {
       pushFail(diagnostics, 'ios-project', 'ios/App exists but has no Xcode project/workspace');
+    }
+    // Assert the GENERATED project actually carries the spec settings — the
+    // config metadata declaring them is not enough; `cap add` seeds cap
+    // defaults (iOS 14, portrait+landscape) that must be corrected.
+    const pbxproj = readGenerated('ios/App/App.xcodeproj/project.pbxproj');
+    if (pbxproj !== null) {
+      const targets = [...pbxproj.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([0-9.]+);/g)].map((m) => m[1]);
+      const wrong = targets.filter((t) => t !== IOS_DEPLOYMENT_TARGET);
+      if (targets.length === 0) {
+        pushFail(diagnostics, 'ios-project', 'no IPHONEOS_DEPLOYMENT_TARGET found in project.pbxproj');
+      } else if (wrong.length > 0) {
+        pushFail(
+          diagnostics,
+          'ios-project',
+          `IPHONEOS_DEPLOYMENT_TARGET must be ${IOS_DEPLOYMENT_TARGET} everywhere; found ${[...new Set(wrong)].join(', ')}`,
+        );
+      }
+    }
+    const infoPlist = readGenerated('ios/App/App/Info.plist');
+    if (infoPlist !== null) {
+      const hasPortrait = /UIInterfaceOrientationPortrait(?!Upside)/.test(infoPlist);
+      const hasLandscapeL = /UIInterfaceOrientationLandscapeLeft/.test(infoPlist);
+      const hasLandscapeR = /UIInterfaceOrientationLandscapeRight/.test(infoPlist);
+      if (hasPortrait) {
+        pushFail(diagnostics, 'ios-project', 'Info.plist must not allow portrait (landscape-only)');
+      }
+      if (!hasLandscapeL || !hasLandscapeR) {
+        pushFail(diagnostics, 'ios-project', 'Info.plist must allow both landscape orientations');
+      }
     }
   } else if (toolchainAvailable) {
     pushFail(diagnostics, 'ios-project', 'ios/App is missing (toolchain present — run npx cap add ios)');
@@ -304,7 +333,7 @@ export function validateNativeProjects({
   validateNativeMetadata(metadata, diagnostics);
   validateDeterministicCommands(exists, diagnostics);
   validateAssetMasters(exists, diagnostics);
-  validateGeneratedProjects(exists, diagnostics, { toolchainAvailable });
+  validateGeneratedProjects(exists, diagnostics, { toolchainAvailable, readGenerated: read });
 
   const failures = diagnostics.filter((d) => d.status === 'fail');
   const skipped = diagnostics.filter((d) => d.status === 'skipped-toolchain-absent');
