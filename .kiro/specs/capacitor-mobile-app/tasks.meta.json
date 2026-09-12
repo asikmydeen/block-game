@@ -1,0 +1,593 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create and run a pre-install dependency-contract validator": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899883759
+      },
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899914997
+      }
+    ],
+    "1.2 Pin and install the verified dependency set exactly": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899883970
+      },
+      {
+        "executionId": "946c4922-9e59-4515-8f80-d618cada952e",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788909894206
+      },
+      {
+        "executionId": "d6906a69-6eea-465a-b1bf-dc076b6e79a0",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788928988251
+      },
+      {
+        "executionId": "d6906a69-6eea-465a-b1bf-dc076b6e79a0",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788929012826
+      },
+      {
+        "executionId": "d6906a69-6eea-465a-b1bf-dc076b6e79a0",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788929488182
+      }
+    ],
+    "1.3 Add deterministic unit, property, DOM, server, and browser test infrastructure": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899884379
+      },
+      {
+        "executionId": "d6906a69-6eea-465a-b1bf-dc076b6e79a0",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788929498876
+      }
+    ],
+    "2.1 RED: Specify endpoint, API-client, and native-build validation behavior": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899884844
+      },
+      {
+        "executionId": "767c589a-d219-4d10-ad3e-f68d16c61bb1",
+        "chatSessionId": "sess_f3001f5d-09d1-44f4-be25-9feeadea5097",
+        "timestamp": 1788982174079
+      }
+    ],
+    "2.2 GREEN: Implement endpoint configuration and route all client transport through it": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899885133
+      }
+    ],
+    "2.3 Write the property test for authoritative endpoint resolution": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899885989
+      }
+    ],
+    "2.4 RED: Specify exact HTTP and WebSocket origin decisions": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899888101
+      }
+    ],
+    "2.5 GREEN: Enforce the shared origin policy before HTTP routes and WS connections": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899888463
+      }
+    ],
+    "2.6 Write the property test for exact origin membership": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899888697
+      }
+    ],
+    "2.7 Lock backend and endpoint compatibility with integration coverage": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899888993
+      }
+    ],
+    "3. Checkpoint — endpoint and server boundary": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899889376
+      }
+    ],
+    "4.1 RED: Specify auth adapters and serialized session transitions": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899890253
+      }
+    ],
+    "4.2 GREEN: Implement web/native auth storage and account-session ordering": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899890528
+      }
+    ],
+    "4.3 Write the property test for auth transition ordering": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899891078
+      }
+    ],
+    "4.4 Write the property test for web auth fallback compatibility": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899891878
+      }
+    ],
+    "4.5 RED: Specify asynchronous `AppServices` bootstrap and recoverable startup states": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899892023
+      }
+    ],
+    "4.6 GREEN: Create and inject app services before React mounts": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899892262
+      }
+    ],
+    "5.1 RED: Specify foreground clock, latest-only progress, and normalized transitions": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899892490
+      }
+    ],
+    "5.2 GREEN: Implement lifecycle coordination, pending progress, and foreground clock": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899892683
+      }
+    ],
+    "5.3 Write the property test for newest pending progress": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899892801
+      }
+    ],
+    "5.4 Write the property test for foreground-only playtime": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899893208
+      }
+    ],
+    "5.5 RED: Specify React/game lifecycle integration and page-hide behavior": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899893452
+      }
+    ],
+    "5.6 GREEN: Wire lifecycle/progress into App, Game, and account state": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899893704
+      }
+    ],
+    "6. Checkpoint — bootstrap, auth, and lifecycle": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899893930
+      }
+    ],
+    "7.1 RED: Specify transport ownership, state transitions, and protocol ordering": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899894039
+      }
+    ],
+    "7.2 GREEN: Implement `MultiplayerClient` and equality-safe multiplayer stores": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899894193
+      }
+    ],
+    "7.3 Write the property test for one eligible multiplayer transport": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899894402
+      }
+    ],
+    "7.4 Write the property test for minimal ordered multiplayer UI transitions": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899894712
+      }
+    ],
+    "7.5 RED: Specify `RemotePlayers` as a render-only scene adapter": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899894822
+      }
+    ],
+    "7.6 GREEN: Rewire the scene and UI to the extracted client": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899895022
+      }
+    ],
+    "8.1 RED: Specify active/retention windows and notification stability": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899895158
+      }
+    ],
+    "8.2 GREEN: Implement bounded `WorldChunkManager` and active-only rendering": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899895363
+      }
+    ],
+    "8.3 Write the property test for bounded centered chunk windows": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899895433
+      }
+    ],
+    "8.4 RED: Specify edit-overlay regeneration and seam invalidation": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899895659
+      }
+    ],
+    "8.5 GREEN: Implement sparse edit overlays and seam-aware mesh revisions": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899895754
+      }
+    ],
+    "8.6 Write the property test for edited chunk regeneration": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896122
+      }
+    ],
+    "8.7 Write the property test for seam mesh semantics": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896378
+      }
+    ],
+    "8.8 RED: Specify geometry replacement/unmount disposal deadlines": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896495
+      }
+    ],
+    "8.9 GREEN: Own and dispose chunk render resources explicitly": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896615
+      }
+    ],
+    "9. Checkpoint — multiplayer and bounded world": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896673
+      }
+    ],
+    "10.1 RED: Specify runtime quality selection and renderer/light budgets": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896735
+      }
+    ],
+    "10.2 GREEN: Apply mobile/desktop quality profiles before Canvas creation": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896806
+      }
+    ],
+    "10.3 Write the property test for quality-profile limits": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896903
+      }
+    ],
+    "10.4 Write the property test for simulation invariance": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899896965
+      }
+    ],
+    "10.5 RED: Specify bounded HUD sampling and frame/React separation": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897103
+      }
+    ],
+    "10.6 GREEN: Replace per-frame React updates with refs and a HUD sampler": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897150
+      }
+    ],
+    "10.7 Write the property test for HUD sampling bounds": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897218
+      }
+    ],
+    "11.1 RED: Specify visual-viewport, safe-area, and layout input gating": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897278
+      }
+    ],
+    "11.2 GREEN: Implement the visual-viewport shell and safe-area layout contract": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897336
+      }
+    ],
+    "11.3 RED: Specify multi-pointer ownership and terminal input reset": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897401
+      }
+    ],
+    "11.4 GREEN: Implement the touch controller and core control clusters": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897464
+      }
+    ],
+    "11.5 Write the property test for terminal touch resets": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897530
+      }
+    ],
+    "11.6 RED: Specify held automatic-fire cadence and termination": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897700
+      }
+    ],
+    "11.7 GREEN: Wire shared primary intent and automatic-fire cadence": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897751
+      }
+    ],
+    "11.8 Write the property test for held automatic fire": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897815
+      }
+    ],
+    "11.9 RED: Encode the complete touch action matrix as command-dispatch tests": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897884
+      }
+    ],
+    "11.10 GREEN: Complete responsive touch paths for every game command": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899897969
+      }
+    ],
+    "12. Checkpoint — rendering and complete touch UI": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898031
+      }
+    ],
+    "13.1 RED: Create native project/configuration smoke validators before scaffolding": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898186
+      }
+    ],
+    "13.2 Add Capacitor config, checked-in platform scaffolding, and command wrappers": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898242
+      }
+    ],
+    "13.3 Configure OS floors, orientation, native plugins, privacy metadata, and assets": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898375
+      }
+    ],
+    "13.4 RED: Specify native shell and plugin-backed runtime-event sequencing": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898453
+      }
+    ],
+    "13.5 GREEN: Implement plugin-backed shell and runtime event adapters": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898530
+      }
+    ],
+    "13.6 Prove sync/build scripts are deterministic and clean": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898623
+      }
+    ],
+    "14.1 RED: Specify release evidence schemas and all-or-nothing acceptance": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898811
+      }
+    ],
+    "14.2 GREEN: Implement machine-readable release evidence and acceptance scripts": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899898906
+      }
+    ],
+    "14.3 Write the property test for release acceptance": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899899021
+      }
+    ],
+    "14.4 RED: Specify the evidence-based advanced-meshing decision": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899899111
+      }
+    ],
+    "14.5 GREEN: Implement the profiling gate as a decision-only validator": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899899220
+      }
+    ],
+    "14.6 Write the property test for profiling authorization": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899899352
+      }
+    ],
+    "14.7 Add and pass the complete browser regression and commit-rate suite": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899899424
+      }
+    ],
+    "14.8 Run complete server and transport integration acceptance": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899900191
+      }
+    ],
+    "14.9 Validate a clean checkout, clean sync, and both native release artifacts": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899900364
+      }
+    ],
+    "14.10 Add native-device automation and instrumentation harnesses": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899900519
+      }
+    ],
+    "14.11 Execute and retain the automated iOS device acceptance suite": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899900648
+      }
+    ],
+    "14.12 Execute and retain the automated Android device acceptance suite": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899900916
+      }
+    ],
+    "14.13 Aggregate release evidence and apply the profiling gate without expanding scope": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899901058
+      }
+    ],
+    "15. Final checkpoint — verify release readiness": [
+      {
+        "executionId": "737714f8-e006-45b5-94f0-2a0d2ffc4bc5",
+        "chatSessionId": "sess_81665e99-d9ec-4be2-a52f-1abaa68b007d",
+        "timestamp": 1788899901150
+      }
+    ],
+    "2. Implement authoritative endpoint resolution and strict server origin policy": [
+      {
+        "executionId": "767c589a-d219-4d10-ad3e-f68d16c61bb1",
+        "chatSessionId": "sess_f3001f5d-09d1-44f4-be25-9feeadea5097",
+        "timestamp": 1788982161048
+      }
+    ]
+  }
+}

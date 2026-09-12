@@ -10,6 +10,66 @@ const SERVICE_KEY =
 
 export const dbConfigured = Boolean(SUPABASE_URL && SERVICE_KEY);
 
+// ── Local in-memory fallback ────────────────────────────────────────────────
+// When no Supabase env is present (local dev / testing), back the same data
+// functions with process-memory maps so auth, persistence, leaderboard, and
+// multiplayer identity all work without an external database. This branch is
+// only ever reached when `dbConfigured` is false, so production (env present)
+// behavior is unchanged. Data lives only for the lifetime of the process.
+const mem = {
+  playersById: new Map(),
+  playersByUsernameLower: new Map(),
+  sessions: new Map(),
+  devices: new Map(),
+  seq: 0,
+};
+
+if (!dbConfigured) {
+  console.warn(
+    '[db] SUPABASE env missing — using in-memory store. Accounts/progress persist only until the server restarts.'
+  );
+}
+
+function clonePlayer(p) {
+  return p ? { ...p, owned_weapons: [...(p.owned_weapons || [])], missions_completed: [...(p.missions_completed || [])] } : p;
+}
+
+function memFindPlayerByUsername(username) {
+  return clonePlayer(mem.playersByUsernameLower.get(username.toLowerCase()) || null);
+}
+
+function memFindPlayerById(id) {
+  return clonePlayer(mem.playersById.get(id) || null);
+}
+
+function memCreatePlayer(username, color) {
+  const now = new Date().toISOString();
+  const player = {
+    id: `mem-${++mem.seq}`,
+    username,
+    color,
+    score: 0,
+    best_score: 0,
+    zombie_kills: 0,
+    deaths: 0,
+    owned_weapons: [],
+    play_seconds: 0,
+    created_at: now,
+    last_seen_at: now,
+    missions_completed: [],
+  };
+  mem.playersById.set(player.id, player);
+  mem.playersByUsernameLower.set(username.toLowerCase(), player);
+  return clonePlayer(player);
+}
+
+function memUpdatePlayerStats(id, patch) {
+  const player = mem.playersById.get(id);
+  if (!player) return null;
+  Object.assign(player, patch);
+  return clonePlayer(player);
+}
+
 function headers(extra = {}) {
   return {
     apikey: SERVICE_KEY,
@@ -52,6 +112,7 @@ export function missionsColumnEnabled() {
 }
 
 export async function findPlayerByUsername(username) {
+  if (!dbConfigured) return memFindPlayerByUsername(username);
   try {
     const rows = await rest(
       `bg_players?select=${playerCols}&username_lower=eq.${encodeURIComponent(username.toLowerCase())}&limit=1`
@@ -64,6 +125,7 @@ export async function findPlayerByUsername(username) {
 }
 
 export async function findPlayerById(id) {
+  if (!dbConfigured) return memFindPlayerById(id);
   try {
     const rows = await rest(`bg_players?select=${playerCols}&id=eq.${encodeURIComponent(id)}&limit=1`);
     return rows?.[0] || null;
@@ -74,6 +136,7 @@ export async function findPlayerById(id) {
 }
 
 export async function createPlayer(username, color) {
+  if (!dbConfigured) return memCreatePlayer(username, color);
   try {
     const rows = await rest(`bg_players?select=${playerCols}`, {
       method: 'POST',
@@ -88,6 +151,11 @@ export async function createPlayer(username, color) {
 }
 
 export async function touchPlayer(id) {
+  if (!dbConfigured) {
+    const p = mem.playersById.get(id);
+    if (p) p.last_seen_at = new Date().toISOString();
+    return;
+  }
   await rest(`bg_players?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
@@ -96,6 +164,7 @@ export async function touchPlayer(id) {
 }
 
 export async function updatePlayerStats(id, patch) {
+  if (!dbConfigured) return memUpdatePlayerStats(id, patch);
   const body = { ...patch };
   if (!missionsColumn) delete body.missions_completed;
   try {
@@ -112,6 +181,10 @@ export async function updatePlayerStats(id, patch) {
 }
 
 export async function createSession(token, playerId, deviceId) {
+  if (!dbConfigured) {
+    mem.sessions.set(token, { token, player_id: playerId, device_id: deviceId || null });
+    return;
+  }
   await rest('bg_sessions', {
     method: 'POST',
     headers: { Prefer: 'return=minimal' },
@@ -120,6 +193,7 @@ export async function createSession(token, playerId, deviceId) {
 }
 
 export async function findSession(token) {
+  if (!dbConfigured) return mem.sessions.get(token) || null;
   const rows = await rest(
     `bg_sessions?select=token,player_id,device_id&token=eq.${encodeURIComponent(token)}&limit=1`
   );
@@ -127,6 +201,7 @@ export async function findSession(token) {
 }
 
 export async function touchSession(token) {
+  if (!dbConfigured) return;
   await rest(`bg_sessions?token=eq.${encodeURIComponent(token)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
@@ -135,6 +210,10 @@ export async function touchSession(token) {
 }
 
 export async function deleteSession(token) {
+  if (!dbConfigured) {
+    mem.sessions.delete(token);
+    return;
+  }
   await rest(`bg_sessions?token=eq.${encodeURIComponent(token)}`, {
     method: 'DELETE',
     headers: { Prefer: 'return=minimal' },
@@ -143,6 +222,10 @@ export async function deleteSession(token) {
 
 // device -> player mapping ("same computer, same account")
 export async function upsertDevice(deviceId, playerId) {
+  if (!dbConfigured) {
+    mem.devices.set(deviceId, { device_id: deviceId, player_id: playerId });
+    return;
+  }
   await rest('bg_devices?on_conflict=device_id', {
     method: 'POST',
     headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
@@ -151,6 +234,7 @@ export async function upsertDevice(deviceId, playerId) {
 }
 
 export async function findDevice(deviceId) {
+  if (!dbConfigured) return mem.devices.get(deviceId) || null;
   const rows = await rest(
     `bg_devices?select=device_id,player_id&device_id=eq.${encodeURIComponent(deviceId)}&limit=1`
   );
@@ -158,6 +242,17 @@ export async function findDevice(deviceId) {
 }
 
 export async function leaderboard(limit = 10) {
+  if (!dbConfigured) {
+    return [...mem.playersById.values()]
+      .sort((a, b) => b.best_score - a.best_score)
+      .slice(0, Number(limit) || 10)
+      .map((p) => ({
+        username: p.username,
+        best_score: p.best_score,
+        zombie_kills: p.zombie_kills,
+        deaths: p.deaths,
+      }));
+  }
   return (
     (await rest(
       `bg_players?select=username,best_score,zombie_kills,deaths&order=best_score.desc&limit=${Number(limit) || 10}`

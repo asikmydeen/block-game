@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HudIcon, type HudGlyph } from './HudIcons';
+import { createTouchController, type TouchController } from '../game/touchInput';
 
 export type PlayStance = 'fight' | 'build';
 
@@ -13,38 +14,60 @@ export interface TouchState {
   place: boolean;
 }
 
+// The single source of touch input truth. TouchControls' handlers drive this
+// controller; Player/Cars/Animals read it (through the compatibility `touchState`
+// view below) once per frame. Continuous state and action latches live in the
+// controller — never in React state — so a held control never forces a commit.
+export const touchController: TouchController = createTouchController();
+
+// Backwards-compatible view: existing consumers read `touchState.moveX` etc.
+// Every getter pulls a fresh NON-consuming snapshot from the controller, so
+// there is no second store to drift and no read accidentally clears the
+// look-delta accumulator (that is done only by consumeLookDelta).
 export const touchState: TouchState = {
-  moveX: 0,
-  moveY: 0,
-  lookDX: 0,
-  lookDY: 0,
-  jump: false,
-  break: false,
-  place: false,
-};
+  get moveX() {
+    return touchController.peek().moveX;
+  },
+  get moveY() {
+    return touchController.peek().moveY;
+  },
+  get lookDX() {
+    return touchController.peek().lookDX;
+  },
+  get lookDY() {
+    return touchController.peek().lookDY;
+  },
+  get jump() {
+    return touchController.peek().jump;
+  },
+  get break() {
+    return touchController.peek().primary;
+  },
+  get place() {
+    return touchController.peek().place;
+  },
+  // Writes are ignored: the controller is authoritative. Kept so the type and
+  // any stray assignment stay valid without reintroducing a second store.
+  set moveX(_v: number) {},
+  set moveY(_v: number) {},
+  set lookDX(_v: number) {},
+  set lookDY(_v: number) {},
+  set jump(_v: boolean) {},
+  set break(_v: boolean) {},
+  set place(_v: boolean) {},
+} as unknown as TouchState;
 
 export function consumeLookDelta(): { dx: number; dy: number } {
-  const dx = touchState.lookDX;
-  const dy = touchState.lookDY;
-  touchState.lookDX = 0;
-  touchState.lookDY = 0;
-  return { dx, dy };
+  const f = touchController.readFrame();
+  return { dx: f.lookDX, dy: f.lookDY };
 }
 
 export function consumeBreak(): boolean {
-  if (touchState.break) {
-    touchState.break = false;
-    return true;
-  }
-  return false;
+  return touchController.consumeEdge('primary');
 }
 
 export function consumePlace(): boolean {
-  if (touchState.place) {
-    touchState.place = false;
-    return true;
-  }
-  return false;
+  return touchController.consumeEdge('place');
 }
 
 interface JoystickProps {
@@ -180,6 +203,7 @@ function LookPad() {
       if (touchRef.current !== null) return;
       const t = e.changedTouches[0];
       touchRef.current = { id: t.identifier, x: t.clientX, y: t.clientY };
+      touchController.lookStart({ pointerId: t.identifier, clientX: t.clientX, clientY: t.clientY });
       e.preventDefault();
     };
 
@@ -188,10 +212,7 @@ function LookPad() {
       for (let i = 0; i < e.touches.length; i++) {
         const t = e.touches[i];
         if (t.identifier === touchRef.current.id) {
-          const dx = t.clientX - touchRef.current.x;
-          const dy = t.clientY - touchRef.current.y;
-          touchState.lookDX += dx;
-          touchState.lookDY += dy;
+          touchController.lookPointer({ pointerId: t.identifier, clientX: t.clientX, clientY: t.clientY });
           touchRef.current.x = t.clientX;
           touchRef.current.y = t.clientY;
           e.preventDefault();
@@ -210,6 +231,7 @@ function LookPad() {
         }
       }
       if (!stillThere) {
+        touchController.lookEnd(touchRef.current.id);
         touchRef.current = null;
       }
     };
@@ -322,8 +344,7 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
       <LookPad />
       <Joystick
         onChange={(x, y) => {
-          touchState.moveX = x;
-          touchState.moveY = y;
+          touchController.setMove(x, y);
         }}
       />
       <ActionButton
@@ -334,10 +355,10 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
         size={72}
         color={driving ? 'rgba(180,140,40,0.6)' : 'rgba(70,130,180,0.55)'}
         onPress={() => {
-          touchState.jump = true;
+          touchController.actionDown('jump', BTN_POINTER);
         }}
         onRelease={() => {
-          touchState.jump = false;
+          touchController.actionUp('jump', BTN_POINTER);
         }}
       />
       {!driving && (
@@ -349,10 +370,10 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
           size={64}
           color="rgba(180,60,60,0.55)"
           onPress={() => {
-            touchState.break = true;
+            touchController.actionDown('primary', ATK_POINTER);
           }}
           onRelease={() => {
-            touchState.break = false;
+            touchController.actionUp('primary', ATK_POINTER);
           }}
         />
       )}
@@ -365,13 +386,20 @@ export function TouchControls({ enabled, stance, driving }: TouchControlsProps) 
           size={64}
           color="rgba(60,150,80,0.55)"
           onPress={() => {
-            touchState.place = true;
+            // Place is a tap: down then immediate up leaves a consumable edge.
+            touchController.actionDown('place', PLACE_POINTER);
+            touchController.actionUp('place', PLACE_POINTER);
           }}
         />
       )}
     </>
   );
 }
+
+// Stable synthetic pointer ids for on-screen buttons (each button owns one).
+const BTN_POINTER = { pointerId: -1, clientX: 0, clientY: 0 } as const;
+const ATK_POINTER = { pointerId: -2, clientX: 0, clientY: 0 } as const;
+const PLACE_POINTER = { pointerId: -3, clientX: 0, clientY: 0 } as const;
 
 export function isTouchDevice(): boolean {
   if (typeof window === 'undefined') return false;

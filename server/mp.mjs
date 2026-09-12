@@ -2,21 +2,62 @@ import { WebSocketServer } from 'ws';
 import * as db from './db.mjs';
 import { LEVEL_TIME, isLevelId } from './levels.mjs';
 
-// Realtime presence + timed level races. Identity comes from the session token.
+// Realtime hub: presence, chat, emotes, a shared event feed and timed level
+// races. Identity always comes from the account session token, so usernames on
+// the roster and in chat cannot be spoofed by a client.
 
 const TICK_MS = 100;
 const STALE_MS = 30_000;
 const PING_COOLDOWN_MS = 2000;
 const RESULT_MS = 6_000;
+const EMOTE_MS = 2600; // how long an emote stays visible to others
+
+const CHAT_MAX_LEN = 180;
+const CHAT_BURST = 5; // messages...
+const CHAT_WINDOW_MS = 6000; // ...allowed per window
+const EMOTE_COOLDOWN_MS = 1200;
+
+const EMOTES = new Set(['wave', 'dance', 'cheer', 'sit']);
+
+// Strip control characters and collapse runs of whitespace. Chat is rendered as
+// plain text in React (no dangerouslySetInnerHTML), so this is about hygiene
+// rather than XSS defence.
+function cleanChat(raw) {
+  return String(raw ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, CHAT_MAX_LEN);
+}
 
 function clamp(v, limit) {
   const n = Number(v);
   return Number.isFinite(n) ? Math.max(-limit, Math.min(limit, n)) : 0;
 }
 
-export function setupMultiplayer(server, { log = console } = {}) {
-  const wss = new WebSocketServer({ server, path: '/api/mp' });
+export function setupMultiplayer(server, { log = console, originPolicy = null } = {}) {
+  // The HTTP server owns the `upgrade` event so the origin policy can decide
+  // before any socket is created. We accept only pre-approved upgrades.
+  const wss = new WebSocketServer({ noServer: true });
   const players = new Map();
+
+  if (server && originPolicy) {
+    server.on('upgrade', (req, socket, head) => {
+      const origin = req.headers.origin;
+      const path = (req.url || '').split('?')[0];
+      const decision = originPolicy.decideUpgrade({ origin, path });
+      if (!decision.allowed) {
+        log.warn?.({ reason: decision.reason, path }, 'mp: upgrade refused');
+        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+    });
+  }
 
   const race = {
     phase: 'idle', // idle | active | won | failed
@@ -33,13 +74,6 @@ export function setupMultiplayer(server, { log = console } = {}) {
     endsAt: race.endsAt,
     winner: race.winner,
   });
-
-  const broadcast = (obj) => {
-    const payload = JSON.stringify(obj);
-    for (const ws of players.keys()) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
-    }
-  };
 
   const resetRace = () => {
     race.phase = 'idle';
@@ -61,6 +95,19 @@ export function setupMultiplayer(server, { log = console } = {}) {
     }
   };
 
+  const now = () => Date.now();
+
+  const broadcast = (payload, { exclude } = {}) => {
+    const data = JSON.stringify(payload);
+    for (const [ws, p] of players) {
+      if (!p.joined || ws === exclude) continue;
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+    }
+  };
+
+  const sendEvent = (kind, text) =>
+    broadcast({ type: 'event', kind, text, ts: now() });
+
   const roster = () =>
     Array.from(players.values())
       .filter((p) => p.joined)
@@ -72,6 +119,10 @@ export function setupMultiplayer(server, { log = console } = {}) {
         y: p.y,
         z: p.z,
         yaw: p.yaw,
+        // Emotes expire on the server so a disconnect can't leave someone
+        // dancing forever.
+        emote: p.emoteUntil > now() ? p.emote : null,
+        score: p.score,
       }));
 
   wss.on('connection', (ws) => {
@@ -84,7 +135,12 @@ export function setupMultiplayer(server, { log = console } = {}) {
       y: 15,
       z: 8,
       yaw: 0,
-      lastSeen: Date.now(),
+      score: 0,
+      emote: null,
+      emoteUntil: 0,
+      lastEmoteAt: 0,
+      chatTimes: [],
+      lastSeen: now(),
       lastPing: 0,
     };
     players.set(ws, state);
@@ -96,8 +152,9 @@ export function setupMultiplayer(server, { log = console } = {}) {
       } catch {
         return;
       }
-      state.lastSeen = Date.now();
+      state.lastSeen = now();
 
+      // ── join: authenticate and announce ──────────────────────────────
       if (msg.type === 'join') {
         const token = typeof msg.token === 'string' ? msg.token : '';
         let player = null;
@@ -132,6 +189,8 @@ export function setupMultiplayer(server, { log = console } = {}) {
         state.playerId = player.id;
         state.username = player.username;
         state.color = player.color || '#ff8800';
+        state.score = player.score ?? 0;
+
         log.info?.({ username: player.username }, 'mp: player joined');
         ws.send(
           JSON.stringify({
@@ -139,22 +198,29 @@ export function setupMultiplayer(server, { log = console } = {}) {
             id: player.id,
             username: player.username,
             color: state.color,
+            emotes: [...EMOTES],
           })
         );
         ws.send(JSON.stringify(raceSnapshot()));
+        sendEvent('join', `${player.username} joined the world`);
         return;
       }
 
-      if (!state.joined) return;
+      if (!state.joined) return; // everything below requires an identity
 
+      // ── state: position/orientation ──────────────────────────────────
       if (msg.type === 'state') {
         state.x = clamp(msg.x, 100000);
         state.y = clamp(msg.y, 1000);
         state.z = clamp(msg.z, 100000);
         state.yaw = clamp(msg.yaw, 10);
+        if (Number.isFinite(Number(msg.score))) {
+          state.score = Math.max(0, Math.min(10_000_000, Math.floor(Number(msg.score))));
+        }
         return;
       }
 
+      // ── level races ──────────────────────────────────────────────────
       if (msg.type === 'level_start') {
         const id = typeof msg.id === 'string' ? msg.id : '';
         if (!isLevelId(id)) return;
@@ -196,21 +262,69 @@ export function setupMultiplayer(server, { log = console } = {}) {
           y: clamp(msg.y, 1000),
           z: clamp(msg.z, 100000),
         });
+        return;
+      }
+
+      // ── chat ─────────────────────────────────────────────────────────
+      if (msg.type === 'chat') {
+        const text = cleanChat(msg.text);
+        if (!text) return;
+
+        // Sliding-window rate limit.
+        state.chatTimes = state.chatTimes.filter((t) => now() - t < CHAT_WINDOW_MS);
+        if (state.chatTimes.length >= CHAT_BURST) {
+          ws.send(JSON.stringify({ type: 'system', text: 'Slow down a moment…' }));
+          return;
+        }
+        state.chatTimes.push(now());
+
+        broadcast({
+          type: 'chat',
+          from: state.username,
+          color: state.color,
+          text,
+          ts: now(),
+        });
+        return;
+      }
+
+      // ── emote ────────────────────────────────────────────────────────
+      if (msg.type === 'emote') {
+        const name = String(msg.emote ?? '');
+        if (!EMOTES.has(name)) return;
+        if (now() - state.lastEmoteAt < EMOTE_COOLDOWN_MS) return;
+        state.lastEmoteAt = now();
+        state.emote = name;
+        state.emoteUntil = now() + EMOTE_MS;
+        broadcast({ type: 'emote', from: state.username, emote: name, ts: now() });
+        return;
+      }
+
+      // ── kill feed: client reports its own zombie kills ───────────────
+      if (msg.type === 'kill') {
+        // Cosmetic only — nothing in the game economy trusts this.
+        sendEvent('kill', `${state.username} took down a zombie`);
+        return;
       }
     });
 
     ws.on('close', () => {
-      if (state.username) log.info?.({ username: state.username }, 'mp: player left');
+      if (state.joined && state.username) {
+        log.info?.({ username: state.username }, 'mp: player left');
+        players.delete(ws);
+        sendEvent('leave', `${state.username} left the world`);
+        return;
+      }
       players.delete(ws);
     });
     ws.on('error', () => players.delete(ws));
   });
 
   const timer = setInterval(() => {
-    const now = Date.now();
+    const t = now();
     tickRace();
     for (const [ws, p] of players) {
-      if (now - p.lastSeen > STALE_MS) {
+      if (t - p.lastSeen > STALE_MS) {
         try {
           ws.close(4408, 'idle');
         } catch {
@@ -221,8 +335,8 @@ export function setupMultiplayer(server, { log = console } = {}) {
     }
     if (players.size === 0) return;
     const payload = JSON.stringify({ type: 'players', players: roster() });
-    for (const ws of players.keys()) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+    for (const [ws, p] of players) {
+      if (p.joined && ws.readyState === WebSocket.OPEN) ws.send(payload);
     }
   }, TICK_MS);
 

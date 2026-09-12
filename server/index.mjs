@@ -5,19 +5,60 @@ import { fileURLToPath } from 'node:url';
 import * as db from './db.mjs';
 import * as auth from './auth.mjs';
 import { setupMultiplayer } from './mp.mjs';
+import { parseAllowlist, createOriginPolicy } from './origin-policy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.resolve(__dirname, '..', 'dist', 'public');
 const port = Number(process.env.PORT ?? 3000);
 
-const app = express();
-app.disable('x-powered-by');
-app.use(express.json({ limit: '64kb' }));
+/**
+ * Build the Express app and its origin policy. Returns a handle exposing the
+ * request handler and an `attach(server)` that wires the policy-gated WebSocket
+ * upgrade. The allowlist is parsed exactly once here (fail-closed at startup).
+ */
+export function createApp({
+  log = console,
+  allowlistSource = process.env.ORIGIN_ALLOWLIST,
+  production = process.env.NODE_ENV === 'production',
+  allowOriginlessUpgrade = process.env.ALLOW_ORIGINLESS_WS === '1',
+} = {}) {
+  const originPolicy = createOriginPolicy({
+    allowlist: parseAllowlist(allowlistSource),
+    production,
+    allowOriginlessUpgrade,
+  });
 
-const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
-  console.error('[api]', req.method, req.path, String(err));
-  res.status(500).json({ error: 'internal_error' });
-});
+  const app = express();
+  app.disable('x-powered-by');
+
+  // Origin policy runs BEFORE json parsing and every API route. An unapproved
+  // origin is rejected here (403) so no route handler ever executes for it, and
+  // no request body is parsed on its behalf.
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api/')) return next();
+    const origin = req.headers.origin;
+    const isPreflight = req.method === 'OPTIONS';
+    const decision = originPolicy.decideHttp({
+      origin,
+      method: req.method,
+      isPreflight,
+      requestHeaders: req.headers['access-control-request-headers'],
+    });
+    for (const [k, v] of Object.entries(decision.headers)) res.setHeader(k, v);
+    if (!decision.allowed) {
+      log.warn?.({ reason: decision.reason, path: req.path }, 'api: origin refused');
+      return res.status(403).json({ error: 'origin_not_allowed' });
+    }
+    if (decision.isPreflight) return res.status(204).end();
+    return next();
+  });
+
+  app.use(express.json({ limit: '64kb' }));
+
+  const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
+    log.error?.('[api]', req.method, req.path, String(err));
+    res.status(500).json({ error: 'internal_error' });
+  });
 
 // ── Health ────────────────────────────────────────────────────────────────
 app.get('/api/healthz', (_req, res) => {
@@ -131,25 +172,47 @@ app.get('/api/leaderboard', wrap(async (req, res) => {
 }));
 
 // ── Static frontend + SPA fallback ────────────────────────────────────────
-// Hashed assets are safe to cache; index.html must not be, or a stale shell
-// keeps pointing at asset hashes that no longer exist after a deploy.
-app.use(express.static(STATIC_DIR, { maxAge: '1h', index: false }));
+  // Hashed assets are safe to cache; index.html must not be, or a stale shell
+  // keeps pointing at asset hashes that no longer exist after a deploy.
+  app.use(express.static(STATIC_DIR, { maxAge: '1h', index: false }));
 
-app.get('/api/*splat', (_req, res) => res.status(404).json({ error: 'not_found' }));
+  app.get('/api/*splat', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
-const sendIndex = (_req, res) => {
-  res.set('Cache-Control', 'no-cache');
-  res.sendFile(path.join(STATIC_DIR, 'index.html'));
-};
-// Express 5's '/*splat' does not match the root path, so '/' is explicit.
-app.get('/', sendIndex);
-app.get('/*splat', sendIndex);
+  const sendIndex = (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(STATIC_DIR, 'index.html'));
+  };
+  // Express 5's '/*splat' does not match the root path, so '/' is explicit.
+  app.get('/', sendIndex);
+  app.get('/*splat', sendIndex);
 
-const server = createServer(app);
-setupMultiplayer(server, { log: console });
+  function attach(server) {
+    // The multiplayer hub owns the policy-gated upgrade; the HTTP server hands
+    // it the `upgrade` event so an unapproved origin is refused before any
+    // socket is created.
+    setupMultiplayer(server, { log, originPolicy });
+    return server;
+  }
 
-server.listen(port, () => {
-  console.log(
-    `[block-game] listening on ${port} · static=${STATIC_DIR} · db=${db.dbConfigured ? 'ok' : 'MISSING SUPABASE ENV'}`
-  );
-});
+  return { handler: app, app, attach, originPolicy };
+}
+
+// ── Bootstrap (only when run directly, not when imported by tests) ─────────
+const isMain = (() => {
+  try {
+    return process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+  } catch {
+    return false;
+  }
+})();
+
+if (isMain) {
+  const { handler, attach } = createApp({ log: console });
+  const server = createServer(handler);
+  attach(server);
+  server.listen(port, () => {
+    console.log(
+      `[block-game] listening on ${port} · static=${STATIC_DIR} · db=${db.dbConfigured ? 'ok' : 'MISSING SUPABASE ENV'}`
+    );
+  });
+}

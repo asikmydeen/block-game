@@ -1,0 +1,48 @@
+Capacitor Mobile App task 1.1 — expected pre-install RED
+Checked at: 2026-09-08T21:17:59Z
+Command: node scripts/native/verify-dependency-contract.mjs
+Exit code: 1
+
+[MISSING_PIN] @capacitor/core is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @capacitor/cli is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @capacitor/ios is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @capacitor/android is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @aparajita/capacitor-secure-storage is missing; pin it to exactly 7.1.6
+[MISSING_PIN] @capacitor/app is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @capacitor/network is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @capacitor/preferences is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @capacitor/screen-orientation is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @capacitor/status-bar is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @capacitor/splash-screen is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @capacitor/assets is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] vitest is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] fast-check is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] jsdom is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @testing-library/react is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @testing-library/user-event is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[MISSING_PIN] @playwright/test is missing; pin the exact registry-qualified version recorded in compatibility evidence
+[EVIDENCE_ABSENT] validation/mobile/dependency-compatibility.json is missing; registry and upstream evidence is required
+
+After live metadata evidence refresh
+Checked at: 2026-09-08T21:48:58Z
+Command: node scripts/native/verify-dependency-contract.mjs
+Exit code: 1
+
+[MISSING_PIN] @capacitor/core is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @capacitor/cli is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @capacitor/ios is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @capacitor/android is missing; pin it to exactly 7.4.4
+[MISSING_PIN] @aparajita/capacitor-secure-storage is missing; pin it to exactly 7.1.6
+[MISSING_PIN] @capacitor/app is missing; pin the exact registry-qualified version 7.1.2
+[MISSING_PIN] @capacitor/network is missing; pin the exact registry-qualified version 7.0.4
+[MISSING_PIN] @capacitor/preferences is missing; pin the exact registry-qualified version 7.0.4
+[MISSING_PIN] @capacitor/screen-orientation is missing; pin the exact registry-qualified version 7.0.4
+[MISSING_PIN] @capacitor/status-bar is missing; pin the exact registry-qualified version 7.0.6
+[MISSING_PIN] @capacitor/splash-screen is missing; pin the exact registry-qualified version 7.0.5
+[MISSING_PIN] @capacitor/assets is missing; pin the exact registry-qualified version 3.0.5
+[MISSING_PIN] vitest is missing; pin the exact registry-qualified version 4.1.11
+[MISSING_PIN] fast-check is missing; pin the exact registry-qualified version 4.9.0
+[MISSING_PIN] jsdom is missing; pin the exact registry-qualified version 27.0.1
+[MISSING_PIN] @testing-library/react is missing; pin the exact registry-qualified version 16.3.3
+[MISSING_PIN] @testing-library/user-event is missing; pin the exact registry-qualified version 14.6.7
+[MISSING_PIN] @playwright/test is missing; pin the exact registry-qualified version 1.63.0
